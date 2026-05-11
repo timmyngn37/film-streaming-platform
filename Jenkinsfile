@@ -21,8 +21,8 @@ pipeline {
                 sh 'docker build -t ${IMAGE_BACKEND} ./backend'
                 sh 'docker build -t ${IMAGE_FRONTEND} ./frontend'
                 // Save the Docker images as tar files and archive them as build artifacts with fingerprinting enabled
-                sh 'docker save ${IMAGE_BACKEND}:${VERSION} > backend-${VERSION}.tar'
-                sh 'docker save ${IMAGE_FRONTEND}:${VERSION} > frontend-${VERSION}.tar'
+                sh 'docker save ${IMAGE_BACKEND} > backend-${VERSION}.tar'
+                sh 'docker save ${IMAGE_FRONTEND} > frontend-${VERSION}.tar'
                 archiveArtifacts artifacts: '*.tar', fingerprint: true
             }
             post {
@@ -33,9 +33,10 @@ pipeline {
                 }
                 success {
                     // Push the built Docker images to a container registry using the provided credentials
-                    sh 'docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD'
-                    sh 'docker push ${IMAGE_BACKEND}:${VERSION}'
-                    sh 'docker push ${IMAGE_FRONTEND}:${VERSION}'
+                    sh 'echo $DOCKER_CREDENTIALS_PSW | docker login -u $DOCKER_CREDENTIALS_USR --password-stdin'
+                    sh 'docker push ${IMAGE_BACKEND}'
+                    sh 'docker push ${IMAGE_FRONTEND}'
+                    echo 'Build succeeded. Proceeding to the next stage...'
                 }
                 failure {
                     echo 'Build failed. Sending notification...'
