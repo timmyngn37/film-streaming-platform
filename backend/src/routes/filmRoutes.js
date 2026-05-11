@@ -14,13 +14,13 @@ const validateId = (req, res, next) => {
 };
 
 router.post('/:id/thumbnail', authenticate, requireAdmin,
-    ...uploadImage.single('thumbnail'),
+    uploadImage.single('thumbnail'),
     validateId,
     filmController.uploadThumbnail
 );
 
 router.post('/:id/video', authenticate, requireAdmin,
-    ...uploadVideo.single('video'),
+    uploadVideo.single('video'),
     validateId,
     filmController.uploadVideo
 );
