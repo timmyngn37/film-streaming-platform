@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="jest tests" tests="20" failures="0" errors="0" time="16.573">
+  <testsuite name="POST /api/register" errors="0" failures="0" skipped="0" timestamp="2026-05-11T09:05:17" time="10.99" tests="6">
+    <testcase classname="POST /api/register should register a new user and return token" name="POST /api/register should register a new user and return token" time="0.546">
+    </testcase>
+    <testcase classname="POST /api/register should return 400 if username or password missing" name="POST /api/register should return 400 if username or password missing" time="0.07">
+    </testcase>
+    <testcase classname="POST /api/register should return 409 if username already exists" name="POST /api/register should return 409 if username already exists" time="0.192">
+    </testcase>
+    <testcase classname="POST /api/login should login and return token" name="POST /api/login should login and return token" time="0.286">
+    </testcase>
+    <testcase classname="POST /api/login should return 401 with wrong password" name="POST /api/login should return 401 with wrong password" time="0.29">
+    </testcase>
+    <testcase classname="POST /api/login should return 401 with wrong username" name="POST /api/login should return 401 with wrong username" time="0.203">
+    </testcase>
+  </testsuite>
+  <testsuite name="GET /api/films" errors="0" failures="0" skipped="0" timestamp="2026-05-11T09:05:28" time="5.348" tests="14">
+    <testcase classname="GET /api/films should return empty array when no films" name="GET /api/films should return empty array when no films" time="0.026">
+    </testcase>
+    <testcase classname="GET /api/films should return list of films" name="GET /api/films should return list of films" time="0.035">
+    </testcase>
+    <testcase classname="POST /api/films should create film as admin" name="POST /api/films should create film as admin" time="0.031">
+    </testcase>
+    <testcase classname="POST /api/films should return 403 if not admin" name="POST /api/films should return 403 if not admin" time="0.019">
+    </testcase>
+    <testcase classname="POST /api/films should return 401 if no token" name="POST /api/films should return 401 if no token" time="0.026">
+    </testcase>
+    <testcase classname="POST /api/films should return 400 if title missing" name="POST /api/films should return 400 if title missing" time="0.041">
+    </testcase>
+    <testcase classname="GET /api/films/:id should return film by id" name="GET /api/films/:id should return film by id" time="0.046">
+    </testcase>
+    <testcase classname="GET /api/films/:id should return 400 for invalid id" name="GET /api/films/:id should return 400 for invalid id" time="0.026">
+    </testcase>
+    <testcase classname="GET /api/films/:id should return 404 if film not found" name="GET /api/films/:id should return 404 if film not found" time="0.036">
+    </testcase>
+    <testcase classname="PUT /api/films/:id should update film as admin" name="PUT /api/films/:id should update film as admin" time="0.07">
+    </testcase>
+    <testcase classname="PUT /api/films/:id should return 403 if not admin" name="PUT /api/films/:id should return 403 if not admin" time="0.032">
+    </testcase>
+    <testcase classname="DELETE /api/films/:id should delete film as admin" name="DELETE /api/films/:id should delete film as admin" time="0.068">
+    </testcase>
+    <testcase classname="DELETE /api/films/:id should return 403 if not admin" name="DELETE /api/films/:id should return 403 if not admin" time="0.047">
+    </testcase>
+    <testcase classname="DELETE /api/films/:id should return 404 if film not found" name="DELETE /api/films/:id should return 404 if film not found" time="0.037">
+    </testcase>
+  </testsuite>
+</testsuites>
