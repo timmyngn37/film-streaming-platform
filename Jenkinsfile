@@ -15,7 +15,6 @@ pipeline {
         VERSION = "${BUILD_NUMBER}"
         IMAGE_BACKEND = "timmyngn/my-backend:${BUILD_NUMBER}"
         IMAGE_FRONTEND = "timmyngn/my-frontend:${BUILD_NUMBER}"
-        JWT_SECRET = credentials('jwt-secret')
     }
 
     stages {
@@ -72,21 +71,22 @@ pipeline {
                 echo 'Testing...'
                 // Install dependencies and run tests with coverage
                 sh 'cd backend && npm install'
-                withEnv(["JWT_SECRET=${JWT_SECRET}"]) {
+                 withCredentials([string(credentialsId: 'jwt-secret', variable: 'JWT_SECRET')]) {
                     sh 'cd backend && npm test'
                     sh 'cd backend && npm run test:coverage'
                 }
                 // Archive test results and coverage reports
                 archiveArtifacts artifacts: 'backend/test-results/*.xml', fingerprint: true
-                archiveArtifacts artifacts: 'backend/coverage-reports/*.html', fingerprint: true
+                archiveArtifacts artifacts: 'backend/coverage/**', fingerprint: true
             }
 
             post {
                 always {
+                    // Publish test results and coverage reports
                     junit 'backend/test-results/junit.xml'
                     publishHTML(target: [
                         reportName: 'Coverage Report',
-                        reportDir: 'backend/coverage-reports',
+                        reportDir: 'backend/coverage/lcov-report',
                         reportFiles: 'index.html',
                         keepAll: true,
                         allowMissing: false,
@@ -107,6 +107,11 @@ pipeline {
         stage('Code Quality Stage') {
             steps {
                 echo 'Checking code quality...'
+
+                def scannerHome = tool 'SonarScanner';
+                withSonarQubeEnv() {
+                    sh "${scannerHome}/bin/sonar-scanner"
+                }
             }
         }
 
