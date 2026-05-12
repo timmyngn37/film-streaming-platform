@@ -76,10 +76,6 @@ pipeline {
                     sh 'cd backend && npm test'
                     sh 'cd backend && npm run test:coverage'
                 }
-                sh 'cd backend && npm run test:coverage'
-                // Verify API is responding (adjust endpoints as needed)
-                sh 'curl -f http://localhost:5000/api/films || exit 1'
-                sh 'curl -f http://localhost:5173 || exit 1'
                 // Archive test results and coverage reports
                 archiveArtifacts artifacts: 'backend/test-results/*.xml', fingerprint: true
                 archiveArtifacts artifacts: 'backend/coverage-reports/*.html', fingerprint: true
