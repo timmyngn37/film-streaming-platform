@@ -150,3 +150,21 @@ describe('DELETE /api/films/:id', () => {
         expect(res.statusCode).toBe(404);
     });
 });
+
+describe('Upload', () => {
+    it('should return 400 if no thumbnail file', async () => {
+        const film = await Film.create({ title: 'Test', releaseYear: 2024 });
+        const res = await request(app)
+            .post(`/api/films/${film._id}/thumbnail`)
+            .set('Authorization', `Bearer ${adminToken}`);
+        expect(res.statusCode).toBe(400);
+    });
+
+    it('should return 400 if no video file', async () => {
+        const film = await Film.create({ title: 'Test', releaseYear: 2024 });
+        const res = await request(app)
+            .post(`/api/films/${film._id}/video`)
+            .set('Authorization', `Bearer ${adminToken}`);
+        expect(res.statusCode).toBe(400);
+    });
+});

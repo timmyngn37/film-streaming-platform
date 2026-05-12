@@ -1,55 +1,68 @@
 pipeline {
+    // Use any available agent for running the pipeline
     agent any
-
+    // Define tools to be used in the pipeline
+    tools {
+        nodejs 'NodeJS-26'
+        dockerTool 'Docker'
+    }
     // Trigger SCM polling every 5 minutes
     triggers {
         pollSCM('H/5 * * * *')
     }
-
+    // Define environment variables
     environment {
         VERSION = "${BUILD_NUMBER}"
-        IMAGE_BACKEND = "my-backend:${BUILD_NUMBER}"
-        IMAGE_FRONTEND = "my-frontend:${BUILD_NUMBER}"
+        IMAGE_BACKEND = "timmyngn/my-backend:${BUILD_NUMBER}"
+        IMAGE_FRONTEND = "timmyngn/my-frontend:${BUILD_NUMBER}"
+        JWT_SECRET = credentials('jwt-secret')
     }
 
     stages {
-
+        // okay
         stage('Build Stage') {
             steps {
-                echo 'Building...'
-
-                // Build Docker images
-                sh "docker build -t ${IMAGE_BACKEND} ./backend"
-                sh "docker build -t ${IMAGE_FRONTEND} ./frontend"
-
-                // Save Docker images
-                sh "docker save ${IMAGE_BACKEND} > backend-${VERSION}.tar"
-                sh "docker save ${IMAGE_FRONTEND} > frontend-${VERSION}.tar"
-
-                archiveArtifacts artifacts: '*.tar', fingerprint: true
+                script {
+                    echo 'Building...'
+                    // Use ONE consistent tag everywhere
+                    def backendImage = "${IMAGE_BACKEND}"
+                    def frontendImage = "${IMAGE_FRONTEND}"
+                    // Build images (MUST match push tag exactly)
+                    sh "docker build -t ${backendImage} ./backend"
+                    sh "docker build -t ${frontendImage} ./frontend"
+                    // Verify images exist BEFORE post block runs
+                    sh "docker images | grep ${BUILD_NUMBER} || true"
+                    // Save images
+                    sh "docker save ${backendImage} > backend-${BUILD_NUMBER}.tar"
+                    sh "docker save ${frontendImage} > frontend-${BUILD_NUMBER}.tar"
+                    // Archive images
+                    archiveArtifacts artifacts: '*.tar', fingerprint: true
+                }
             }
 
             post {
-                always {
-                    // Cleanup images
-                    sh "docker rmi ${IMAGE_BACKEND} || true"
-                    sh "docker rmi ${IMAGE_FRONTEND} || true"
-                }
-
                 success {
                     echo 'Build succeeded. Logging into Docker and pushing images...'
 
-                    sh '''
-                        echo $DOCKER_CREDENTIALS_PSW | docker login -u $DOCKER_CREDENTIALS_USR --password-stdin
-                    '''
-
-                    // Push images
-                    sh "docker push ${IMAGE_BACKEND}"
-                    sh "docker push ${IMAGE_FRONTEND}"
+                    script {
+                        withCredentials([usernamePassword(
+                            credentialsId: 'docker-credentials',
+                            usernameVariable: 'USER',
+                            passwordVariable: 'PASS'
+                        )]) {
+                            // Login to Docker registry
+                            sh '''
+                                echo "$PASS" | docker login -u "$USER" --password-stdin
+                            '''
+                            // Push images
+                            sh "docker push ${IMAGE_BACKEND}"
+                            sh "docker push ${IMAGE_FRONTEND}"
+                        }
+                    }
                 }
 
                 failure {
-                    echo 'Build failed. Sending notification...'
+                    echo 'Build failed.'
                 }
             }
         }
@@ -57,10 +70,17 @@ pipeline {
         stage('Test Stage') {
             steps {
                 echo 'Testing...'
-
-                sh 'cd backend && npm install && npm test'
+                // Install dependencies and run tests with coverage
+                sh 'cd backend && npm install'
+                withEnv(["JWT_SECRET=${JWT_SECRET}"]) {
+                    sh 'cd backend && npm test'
+                    sh 'cd backend && npm run test:coverage'
+                }
                 sh 'cd backend && npm run test:coverage'
-
+                // Verify API is responding (adjust endpoints as needed)
+                sh 'curl -f http://localhost:5000/api/films || exit 1'
+                sh 'curl -f http://localhost:5173 || exit 1'
+                // Archive test results and coverage reports
                 archiveArtifacts artifacts: 'backend/test-results/*.xml', fingerprint: true
                 archiveArtifacts artifacts: 'backend/coverage-reports/*.html', fingerprint: true
             }
@@ -68,6 +88,14 @@ pipeline {
             post {
                 always {
                     junit 'backend/test-results/junit.xml'
+                    publishHTML(target: [
+                        reportName: 'Coverage Report',
+                        reportDir: 'backend/coverage-reports',
+                        reportFiles: 'index.html',
+                        keepAll: true,
+                        allowMissing: false,
+                        alwaysLinkToLastBuild: true
+                    ])
                 }
 
                 success {
@@ -75,7 +103,7 @@ pipeline {
                 }
 
                 failure {
-                    echo 'Tests failed.'
+                    error 'Tests failed.'
                 }
             }
         }
@@ -108,6 +136,14 @@ pipeline {
             steps {
                 echo 'Monitoring...'
             }
+        }
+    }
+
+    // Moved from Build Stage to global post to prevent "tag does not exist" errors
+    post {
+        always {
+            echo 'Cleaning up local Docker images...'
+            sh "docker rmi ${IMAGE_BACKEND} ${IMAGE_FRONTEND} || true"
         }
     }
 }

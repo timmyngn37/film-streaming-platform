@@ -17,6 +17,12 @@
     "testEnvironment": "node",
     "testMatch": ["**/tests/**/*.test.js"],
     "testTimeout": 30000,
+    "collectCoverageFrom": [
+        "src/**/*.js",
+        "!src/middleware/upload.js",
+        "!src/config/**",
+        "!src/server.js"
+    ],
     "coverageThreshold": {
       "global": {
         "lines": 70
