@@ -130,11 +130,11 @@ pipeline {
                             ${scannerHome}/bin/sonar-scanner \
                                 -Dproject.settings=backend/sonar-project.properties
                         """
-
-                        timeout(time: 5, unit: 'MINUTES') {
-                            waitForQualityGate abortPipeline: true
-                        }
                     }
+                }
+                
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
                 }
             }
         }
