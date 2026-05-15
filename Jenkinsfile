@@ -122,19 +122,24 @@ pipeline {
 
         stage('Code Quality Stage') {
             steps {
-                echo 'Running SonarQube analysis...'
                 script {
                     def scannerHome = tool 'SonarScanner'
+
                     withSonarQubeEnv('SonarQube') {
                         sh """
                             ${scannerHome}/bin/sonar-scanner \
                                 -Dproject.settings=backend/sonar-project.properties
                         """
                     }
-                }
-                
-                timeout(time: 15, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: true
+
+                    sleep(time: 10, unit: 'SECONDS')
+
+                    timeout(time: 3, unit: 'MINUTES') {
+                        def qg = waitForQualityGate()
+                        if (qg.status != 'OK') {
+                            error "Quality Gate failed: ${qg.status}"
+                        }
+                    }
                 }
             }
         }
