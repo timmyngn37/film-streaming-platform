@@ -21,7 +21,7 @@ pipeline {
         stage('Build Stage') {
             steps {
                 script {
-                    echo 'Building Docker images...'
+                    echo 'Building...'
 
                     sh '''
                         docker build -t "$IMAGE_BACKEND" ./backend
@@ -123,14 +123,12 @@ pipeline {
         stage('Code Quality Stage') {
             steps {
                 echo 'Running SonarQube analysis...'
-
                 script {
                     def scannerHome = tool 'SonarScanner'
-
                     withSonarQubeEnv('SonarQube') {
-
                         sh """
-                            ${scannerHome}/bin/sonar-scanner
+                            ${scannerHome}/bin/sonar-scanner \
+                                -Dproject.settings=backend/sonar-project.properties
                         """
                     }
                 }
