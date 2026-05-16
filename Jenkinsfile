@@ -307,7 +307,7 @@ pipeline {
     }
     post {
         always {
-            echo 'Cleaning up local Docker images...'
+            echo 'Cleaning up...'
             // Remove the built Docker images from the local Docker cache to free up space
             sh '''
                 docker rmi "$IMAGE_BACKEND" "$IMAGE_FRONTEND" || true
