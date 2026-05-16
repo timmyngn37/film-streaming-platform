@@ -305,11 +305,10 @@ pipeline {
                         docker ps | grep prometheus || echo "WARNING: Prometheus not running"
                         docker ps | grep grafana || echo "WARNING: Grafana not running"
                         docker ps | grep node-exporter || echo "WARNING: Node Exporter not running"
-
-                        # Verify Prometheus is scraping metrics
                         sleep 5
                         curl -s http://localhost:9090/-/healthy && echo "Prometheus healthy" || echo "WARNING: Prometheus not healthy"
                         curl -s http://localhost:9100/metrics | grep "node_cpu" && echo "Node metrics available" || echo "WARNING: Node metrics not available"
+                        curl -s http://localhost:9090/api/v1/rules | grep "HighCpuUsage" && echo "Alert rules loaded successfully" || echo "WARNING: Alert rules not loaded"
                     '''
                     // Provide information on how to access the monitoring tools and metrics.
                     echo "Prometheus available at http://localhost:9090"

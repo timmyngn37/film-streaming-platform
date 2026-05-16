@@ -48,6 +48,8 @@ services:
       - jenkins_home:/jenkins_home:ro
     command:
       - '--config.file=/jenkins_home/workspace/film-streaming-platform/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
     networks:
       - devnet
     restart: unless-stopped
