@@ -215,10 +215,8 @@ pipeline {
 
                         cp /var/jenkins_home/.env backend/.env
 
-                        docker compose down --remove-orphans || true
-                        docker rm -f node-exporter grafana prometheus sonarqube 2>/dev/null || true
-
-                        VERSION=$BUILD_NUMBER docker compose up -d    
+                        docker rm -f node-exporter grafana prometheus 2>/dev/null || true
+                        VERSION=$BUILD_NUMBER docker compose up -d --no-deps --force-recreate backend frontend
 
                         sleep 10
                         docker ps | grep my-backend || exit 1
