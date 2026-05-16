@@ -21,7 +21,7 @@ pipeline {
         stage('Build Stage') {
             steps {
                 script {
-                    echo 'Building...'
+                    echo 'Building Docker images for backend and frontend...'
 
                     sh '''
                         docker build -t "$IMAGE_BACKEND" ./backend
@@ -122,6 +122,8 @@ pipeline {
 
         stage('Code Quality Stage') {
             steps {
+                echo 'Running SonarQube analysis...'
+
                 script {
                     def scannerHome = tool 'SonarScanner'
 
@@ -146,7 +148,56 @@ pipeline {
 
         stage('Security Stage') {
             steps {
-                echo 'Performing security checks...'
+                script {
+                    echo 'Performing security checks...'
+
+                    sh '''
+                        cd backend
+                        npm audit --json 2>/dev/null > ../audit-report.json || true
+                        npm audit fix --force || true
+                    '''
+
+                    def auditFile = fileExists('audit-report.json')
+                    if (!auditFile) {
+                        error 'audit-report.json was not generated.'
+                    }
+
+                    def auditReport = readJSON file: 'audit-report.json'
+
+                    def vulns = auditReport?.metadata?.vulnerabilities
+                    if (vulns == null) {
+                        echo 'No vulnerability metadata found in audit report.'
+                    } else {
+                        def total = (vulns?.low      ?: 0) +
+                                    (vulns?.moderate  ?: 0) +
+                                    (vulns?.high      ?: 0) +
+                                    (vulns?.critical  ?: 0)
+
+                        echo "Vulnerabilities — low: ${vulns.low}, moderate: ${vulns.moderate}, high: ${vulns.high}, critical: ${vulns.critical}"
+                        echo "Total: ${total}"
+
+                        if (total > 0) {
+                            echo 'Security issues found → documented & mitigated where possible.'
+                            currentBuild.result = 'UNSTABLE'
+                        } else {
+                            echo 'No vulnerabilities found.'
+                        }
+                    }
+
+                    archiveArtifacts artifacts: 'audit-report.json', fingerprint: true
+                }
+            }
+
+            post {
+                success {
+                    echo 'Security checks completed successfully.'
+                }
+                unstable {
+                    echo 'Security stage completed with warnings (vulnerabilities found).'
+                }
+                failure {
+                    echo 'Security checks failed.'
+                }
             }
         }
 
