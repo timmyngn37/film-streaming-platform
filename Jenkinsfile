@@ -304,6 +304,7 @@ pipeline {
                 }
             }
         }
+    }
     post {
         always {
             echo 'Cleaning up local Docker images...'
