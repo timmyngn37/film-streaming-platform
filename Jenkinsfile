@@ -1,9 +1,8 @@
 pipeline {
-    agent any
-
-    tools {
-        nodejs 'NodeJS-26'
-        dockerTool 'Docker'
+    agent {
+        docker {
+            image 'node:26-alpine'
+        }
     }
 
     triggers {
