@@ -43,7 +43,9 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - jenkins_home:/jenkins_home:ro
+    command:
+      - '--config.file=/jenkins_home/workspace/film-streaming-platform/prometheus.yml'
     networks:
       - devnet
     restart: unless-stopped
@@ -73,3 +75,5 @@ volumes:
   sonarqube_data:
   sonarqube_logs:
   sonarqube_extensions:
+  jenkins_home:
+    external: true
