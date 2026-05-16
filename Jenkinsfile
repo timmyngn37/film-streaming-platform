@@ -203,7 +203,38 @@ pipeline {
 
         stage('Deploy Stage') {
             steps {
-                echo 'Deploying application...'
+                script {
+                    echo 'Deploying application...'
+
+                    sh '''
+                        CURRENT=$(docker inspect --format='{{.Config.Image}}' my-backend 2>/dev/null || echo "none")
+                        echo $CURRENT > .previous_version
+
+                        docker-compose up -d --pull always
+
+                        sleep 10
+                        docker ps | grep my-backend || exit 1
+                        docker ps | grep my-frontend || exit 1
+                    '''
+                }
+            }
+
+            post {
+                failure {
+                    echo 'Deployment failed. Rolling back...'
+                    sh '''
+                        PREVIOUS=$(cat .previous_version)
+                        if [ "$PREVIOUS" != "none" ]; then
+                            docker-compose down
+                            sed -i "s|$IMAGE_BACKEND|$PREVIOUS|g" docker-compose.yml
+                            docker-compose up -d
+                            echo "Rolled back to $PREVIOUS"
+                        fi
+                    '''
+                }
+                success {
+                    echo 'Deployment successful.'
+                }
             }
         }
 

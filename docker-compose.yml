@@ -10,7 +10,8 @@ services:
       - devnet
 
   backend:
-    build: ./backend
+    image: timmyngn/my-backend:${VERSION}
+    container_name: my-backend
     ports:
       - "5000:5000"
     env_file:
@@ -19,15 +20,18 @@ services:
       - devnet
     depends_on:
       - sonarqube
+    restart: unless-stopped
 
   frontend:
-    build: ./frontend
+    image: timmyngn/my-frontend:${VERSION}
+    container_name: my-frontend
     ports:
       - "5173:5173"
     depends_on:
       - backend
     networks:
       - devnet
+    restart: unless-stopped
 
 networks:
   devnet:
