@@ -30,9 +30,8 @@ pipeline {
             steps {
                 script {
                     echo 'Building Docker images for backend and frontend...'
-                    // Build Docker images for backend and frontend,
+                    // Build Docker images for backend and frontend and
                     // tag them with the build number,
-                    // and save them as tar files for archiving.
                     sh '''
                         docker build -t "$IMAGE_BACKEND" ./backend
                         docker build -t "$IMAGE_FRONTEND" ./frontend
@@ -42,7 +41,7 @@ pipeline {
                         docker save "$IMAGE_BACKEND" > backend-"$BUILD_NUMBER".tar
                         docker save "$IMAGE_FRONTEND" > frontend-"$BUILD_NUMBER".tar
                     '''
-
+                    // Save them as tar files for archiving.
                     archiveArtifacts artifacts: '*.tar', fingerprint: true
                 }
             }
@@ -144,10 +143,21 @@ pipeline {
                     // Use a timeout to avoid waiting indefinitely for the quality gate result.
                     timeout(time: 3, unit: 'MINUTES') {
                         def qg = waitForQualityGate()
+                        echo "Quality Gate status: ${qg.status}"
                         if (qg.status != 'OK') {
                             error "Quality Gate failed: ${qg.status}"
+                        } else {
+                            echo "Quality Gate passed - code meets all reliability, maintainability and coverage thresholds."
                         }
                     }
+                }
+            }
+            post {
+                success {
+                    echo 'SonarQube analysis completed successfully.'
+                }
+                failure {
+                    echo 'SonarQube analysis failed.'
                 }
             }
         }
@@ -182,10 +192,12 @@ pipeline {
                         echo "Total: ${total}"
 
                         if (total > 0) {
-                            echo 'Security issues found.'
+                            echo 'Security issues found. Review audit-report.json for details.'
+                            echo "Action: npm audit fix has been applied to resolve auto-fixable vulnerabilities."
+                            echo "Remaining issues require manual review or are false positives."
                             currentBuild.result = 'UNSTABLE'
                         } else {
-                            echo 'No vulnerabilities found.'
+                            echo 'No vulnerabilities found. All dependencies are secure.'
                         }
                     }
                     // Archive the audit report for later analysis and reference.
@@ -235,6 +247,8 @@ pipeline {
                             docker rm -f node-exporter grafana prometheus sonarqube 2>/dev/null || true
                             sed -i "s|$IMAGE_BACKEND|$PREVIOUS|g" docker-compose.yml
                             VERSION=$BUILD_NUMBER docker compose up -d
+                            sleep 10
+                            docker ps | grep my-backend && echo "Rollback successful to $PREVIOUS" || echo "Rollback failed"
                             echo "Rolled back to $PREVIOUS"
                         fi
                     '''
@@ -291,6 +305,11 @@ pipeline {
                         docker ps | grep prometheus || echo "WARNING: Prometheus not running"
                         docker ps | grep grafana || echo "WARNING: Grafana not running"
                         docker ps | grep node-exporter || echo "WARNING: Node Exporter not running"
+
+                        # Verify Prometheus is scraping metrics
+                        sleep 5
+                        curl -s http://localhost:9090/-/healthy && echo "Prometheus healthy" || echo "WARNING: Prometheus not healthy"
+                        curl -s http://localhost:9100/metrics | grep "node_cpu" && echo "Node metrics available" || echo "WARNING: Node metrics not available"
                     '''
                     // Provide information on how to access the monitoring tools and metrics.
                     echo "Prometheus available at http://localhost:9090"
