@@ -272,10 +272,34 @@ pipeline {
 
         stage('Monitoring Stage') {
             steps {
-                echo 'Monitoring application...'
+                script {
+                    echo 'Configuring monitoring...'
+
+                    sh '''
+                        VERSION=$BUILD_NUMBER docker compose up -d prometheus grafana node-exporter
+
+                        sleep 5
+
+                        docker ps | grep prometheus || echo "WARNING: Prometheus not running"
+                        docker ps | grep grafana || echo "WARNING: Grafana not running"
+                        docker ps | grep node-exporter || echo "WARNING: Node Exporter not running"
+                    '''
+
+                    echo "Prometheus available at http://localhost:9090"
+                    echo "Grafana dashboard available at http://localhost:3001"
+                    echo "Metrics endpoint: http://localhost:9100/metrics"
+                }
+            }
+
+            post {
+                success {
+                    echo 'Monitoring configured successfully.'
+                }
+                failure {
+                    echo 'Monitoring setup failed.'
+                }
             }
         }
-    }
 
     post {
         always {
