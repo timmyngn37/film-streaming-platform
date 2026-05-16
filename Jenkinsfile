@@ -1,8 +1,9 @@
 pipeline {
-    agent {
-        docker {
-            image 'node:26-alpine'
-        }
+    agent any
+
+    tools {
+        nodejs 'NodeJS-26'
+        dockerTool 'Docker'
     }
 
     triggers {
@@ -153,7 +154,7 @@ pipeline {
                     sh '''
                         cd backend
                         npm audit --json 2>/dev/null > ../audit-report.json || true
-                        npm audit fix --force || true
+                        npm audit fix || true
                     '''
 
                     def auditFile = fileExists('audit-report.json')
@@ -209,7 +210,8 @@ pipeline {
                         CURRENT=$(docker inspect --format='{{.Config.Image}}' my-backend 2>/dev/null || echo "none")
                         echo $CURRENT > .previous_version
 
-                        docker-compose up -d --pull always
+                        cp /var/jenkins_home/.env backend/.env
+                        VERSION=$BUILD_NUMBER docker compose up -d    
 
                         sleep 10
                         docker ps | grep my-backend || exit 1
@@ -224,9 +226,9 @@ pipeline {
                     sh '''
                         PREVIOUS=$(cat .previous_version)
                         if [ "$PREVIOUS" != "none" ]; then
-                            docker-compose down
+                            docker compose down
                             sed -i "s|$IMAGE_BACKEND|$PREVIOUS|g" docker-compose.yml
-                            docker-compose up -d
+                            docker compose up -d
                             echo "Rolled back to $PREVIOUS"
                         fi
                     '''
@@ -240,6 +242,31 @@ pipeline {
         stage('Release Stage') {
             steps {
                 echo 'Releasing application...'
+
+                withCredentials([
+                    string(
+                        credentialsId: 'github-token',
+                        variable: 'GIT_TOKEN'
+                    )
+                ]) {
+                    sh '''
+                        git config user.email "jenkins@ci.com"
+                        git config user.name "Jenkins"
+                        git tag -a v$BUILD_NUMBER -m "Release version $BUILD_NUMBER"
+                        git push https://timmyngn37:$GIT_TOKEN@github.com/timmyngn37/film-streaming-platform.git v$BUILD_NUMBER
+                    '''
+                }
+            }
+            post {
+                success {
+                    echo "Release v${BUILD_NUMBER} completed successfully."
+                    echo "Environment: production"
+                    echo "Backend image: ${IMAGE_BACKEND}"
+                    echo "Frontend image: ${IMAGE_FRONTEND}"
+                }
+                failure {
+                    echo "Release v${BUILD_NUMBER} failed."
+                }
             }
         }
 
