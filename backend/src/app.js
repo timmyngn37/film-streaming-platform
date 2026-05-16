@@ -5,15 +5,17 @@ const dotenv = require('dotenv');
 const path = require('path');
 const User = require('./models/User');
 const promClient = require('prom-client');
+
+dotenv.config();
+
+const app = express();
+
 promClient.collectDefaultMetrics();
 
 app.get('/metrics', async (req, res) => {
     res.set('Content-Type', promClient.register.contentType);
     res.end(await promClient.register.metrics());
 });
-dotenv.config();
-
-const app = express();
 
 app.use(cors());
 app.use(express.json());
