@@ -177,7 +177,7 @@ pipeline {
                         echo "Total: ${total}"
 
                         if (total > 0) {
-                            echo 'Security issues found → documented & mitigated where possible.'
+                            echo 'Security issues found.'
                             currentBuild.result = 'UNSTABLE'
                         } else {
                             echo 'No vulnerabilities found.'
