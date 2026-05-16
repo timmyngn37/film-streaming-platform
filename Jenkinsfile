@@ -214,6 +214,10 @@ pipeline {
                         echo $CURRENT > .previous_version
 
                         cp /var/jenkins_home/.env backend/.env
+
+                        docker compose down --remove-orphans || true
+                        docker rm -f node-exporter grafana prometheus sonarqube 2>/dev/null || true
+
                         VERSION=$BUILD_NUMBER docker compose up -d    
 
                         sleep 10
@@ -222,7 +226,6 @@ pipeline {
                     '''
                 }
             }
-
             post {
                 failure {
                     echo 'Deployment failed. Rolling back...'
@@ -230,9 +233,10 @@ pipeline {
                     sh '''
                         PREVIOUS=$(cat .previous_version)
                         if [ "$PREVIOUS" != "none" ]; then
-                            docker compose down
+                            docker compose down --remove-orphans || true
+                            docker rm -f node-exporter grafana prometheus sonarqube 2>/dev/null || true
                             sed -i "s|$IMAGE_BACKEND|$PREVIOUS|g" docker-compose.yml
-                            docker compose up -d
+                            VERSION=$BUILD_NUMBER docker compose up -d
                             echo "Rolled back to $PREVIOUS"
                         fi
                     '''
@@ -281,6 +285,7 @@ pipeline {
                     echo 'Configuring monitoring...'
                     // Deploy Prometheus, Grafana, and Node Exporter using Docker Compose, and verify that they are running.
                     sh '''
+                        docker rm -f node-exporter grafana prometheus 2>/dev/null || true
                         VERSION=$BUILD_NUMBER docker compose up -d prometheus grafana node-exporter
 
                         sleep 5
