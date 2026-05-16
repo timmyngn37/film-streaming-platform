@@ -308,11 +308,12 @@ pipeline {
     post {
         always {
             echo 'Cleaning up local Docker images...'
-            // Remove the built Docker images from the local Docker cache to free up space,
-            // ignoring errors if they don't exist.
+            // Remove the built Docker images from the local Docker cache to free up space
             sh '''
                 docker rmi "$IMAGE_BACKEND" "$IMAGE_FRONTEND" || true
             '''
+            // Use the cleanWs step to clean up the workspace after the pipeline completes  
+            cleanWs()
         }
     }
 }
