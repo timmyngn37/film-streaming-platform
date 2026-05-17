@@ -228,6 +228,8 @@ pipeline {
                         cp /var/jenkins_home/.env backend/.env
 
                         docker rm -f node-exporter grafana prometheus 2>/dev/null || true
+                        VERSION=$BUILD_NUMBER docker compose up -d sonarqube
+                        sleep 30
                         VERSION=$BUILD_NUMBER docker compose up -d --no-deps --force-recreate backend frontend
 
                         sleep 10
