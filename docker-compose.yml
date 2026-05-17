@@ -32,7 +32,7 @@ services:
     image: timmyngn/my-frontend:latest
     container_name: my-frontend
     ports:
-      - "5173:5173"
+      - "5173:80"
     depends_on:
       - backend
     networks:
