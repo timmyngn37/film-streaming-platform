@@ -31,7 +31,7 @@ pipeline {
                 script {
                     echo 'Building Docker images for backend and frontend...'
                     // Build Docker images for backend and frontend and
-                    // tag them with the build number,
+                    // tag them with the build number to ensure uniqueness.
                     sh '''
                         docker build -t "$IMAGE_BACKEND" ./backend
                         docker build -t "$IMAGE_FRONTEND" ./frontend
