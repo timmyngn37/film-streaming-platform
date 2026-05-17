@@ -455,38 +455,69 @@ pipeline {
             steps {
                 script {
                     echo 'Configuring monitoring...'
+
                     sh '''
                         docker rm -f node-exporter grafana prometheus alertmanager 2>/dev/null || true
                         VERSION=$BUILD_NUMBER docker compose up -d prometheus grafana node-exporter alertmanager
 
                         echo "Waiting for services to start..."
-                        sleep 10
 
-                        for i in 1 2 3 4 5; do
-                            curl -sf http://localhost:9090/-/healthy && echo "Prometheus healthy" && break
+                        sleep 30
+
+                        # Promethus health check with retries
+                        for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+                            if curl -sf http://localhost:9090/-/healthy; then
+                                echo "Prometheus healthy"
+                                break
+                            fi
+
                             echo "Waiting for Prometheus... attempt $i"
                             sleep 5
-                            if [ $i -eq 5 ]; then echo "ERROR: Prometheus not healthy" && exit 1; fi
+
+                            if [ $i -eq 12 ]; then
+                                echo "ERROR: Prometheus not healthy"
+                                docker logs prometheus --tail 100 || true
+                                docker ps -a || true
+                                exit 1
+                            fi
                         done
 
-                        for i in 1 2 3 4 5; do
-                            curl -sf http://localhost:3001/api/health | grep -q "ok" && echo "Grafana healthy" && break
+                        # Grafana health check with retries
+                        for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+                            if curl -sf http://localhost:3001/api/health | grep -q "ok"; then
+                                echo "Grafana healthy"
+                                break
+                            fi
+
                             echo "Waiting for Grafana... attempt $i"
                             sleep 5
-                            if [ $i -eq 5 ]; then echo "WARNING: Grafana not healthy"; fi
+
+                            if [ $i -eq 12 ]; then
+                                echo "ERROR: Grafana not healthy"
+                                docker logs grafana --tail 100 || true
+                                docker ps -a || true
+                                exit 1
+                            fi
                         done
 
-                        curl -sf http://localhost:9093/-/healthy && echo "Alertmanager healthy" || echo "WARNING: Alertmanager not healthy"
+                        # Alertmanager health check
+                        curl -sf http://localhost:9093/-/healthy \
+                            && echo "Alertmanager healthy" \
+                            || echo "WARNING: Alertmanager not healthy"
 
-                        curl -sf http://localhost:9100/metrics | grep -q "node_cpu" \
+                        # Node Exporter metrics check
+                        curl -sf http://localhost:9100/metrics \
+                            | grep -q "node_cpu" \
                             && echo "Node metrics available" \
                             || echo "WARNING: Node metrics not available"
 
+                        # Promethus targets check
                         curl -sf http://localhost:9090/api/v1/targets \
                             | grep -q '"health":"up"' \
                             && echo "Prometheus targets healthy" \
                             || echo "WARNING: Some targets are down"
 
+                        # Alert rules check
                         curl -sf http://localhost:9090/api/v1/rules \
                             | grep -q "HighCpuUsage" \
                             && echo "Alert rules loaded" \
@@ -499,13 +530,25 @@ pipeline {
                     echo "Node Exporter: http://localhost:9100/metrics"
                 }
             }
+
             post {
                 success {
                     echo 'Monitoring configured successfully.'
                 }
+
                 failure {
                     echo 'Monitoring setup failed.'
-                    sh 'docker rm -f prometheus grafana node-exporter alertmanager 2>/dev/null || true'
+                    sh '''
+                        docker logs prometheus 2>/dev/null || true
+                        docker logs grafana 2>/dev/null || true
+                        docker logs alertmanager 2>/dev/null || true
+                        docker logs node-exporter 2>/dev/null || true
+
+                        docker ps -a || true
+                    '''
+                    sh '''
+                        docker rm -f prometheus grafana node-exporter alertmanager 2>/dev/null || true
+                    '''
                 }
             }
         }
@@ -515,7 +558,9 @@ pipeline {
             echo 'Cleaning up...'
             // Remove the built Docker images from the local Docker cache to free up space
             sh '''
-                docker rmi "$IMAGE_BACKEND" "$IMAGE_FRONTEND" || true
+                docker rm -f my-backend my-frontend 2>/dev/null || true
+
+                docker rmi -f "$IMAGE_BACKEND" "$IMAGE_FRONTEND" || true
             '''
             // Use the cleanWs step to clean up the workspace after the pipeline completes  
             cleanWs(patterns: [[pattern: 'prometheus.yml', type: 'EXCLUDE']])
