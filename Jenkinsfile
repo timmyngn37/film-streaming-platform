@@ -327,25 +327,48 @@ pipeline {
             steps {
                 script {
                     echo 'Configuring monitoring...'
-                    // Deploy Prometheus, Grafana, and Node Exporter using Docker Compose, and verify that they are running.
                     sh '''
-                        docker rm -f node-exporter grafana prometheus 2>/dev/null || true
-                        VERSION=$BUILD_NUMBER docker compose up -d prometheus grafana node-exporter
+                        docker rm -f node-exporter grafana prometheus alertmanager 2>/dev/null || true
+                        VERSION=$BUILD_NUMBER docker compose up -d prometheus grafana node-exporter alertmanager
 
-                        sleep 5
+                        echo "Waiting for services to start..."
+                        sleep 10
 
-                        docker ps | grep prometheus || echo "WARNING: Prometheus not running"
-                        docker ps | grep grafana || echo "WARNING: Grafana not running"
-                        docker ps | grep node-exporter || echo "WARNING: Node Exporter not running"
-                        sleep 5
-                        curl -s http://localhost:9090/-/healthy && echo "Prometheus healthy" || echo "WARNING: Prometheus not healthy"
-                        curl -s http://localhost:9100/metrics | grep "node_cpu" && echo "Node metrics available" || echo "WARNING: Node metrics not available"
-                        curl -s http://localhost:9090/api/v1/rules | grep "HighCpuUsage" && echo "Alert rules loaded successfully" || echo "WARNING: Alert rules not loaded"
+                        for i in 1 2 3 4 5; do
+                            curl -sf http://localhost:9090/-/healthy && echo "Prometheus healthy" && break
+                            echo "Waiting for Prometheus... attempt $i"
+                            sleep 5
+                            if [ $i -eq 5 ]; then echo "ERROR: Prometheus not healthy" && exit 1; fi
+                        done
+
+                        for i in 1 2 3 4 5; do
+                            curl -sf http://localhost:3001/api/health | grep -q "ok" && echo "Grafana healthy" && break
+                            echo "Waiting for Grafana... attempt $i"
+                            sleep 5
+                            if [ $i -eq 5 ]; then echo "WARNING: Grafana not healthy"; fi
+                        done
+
+                        curl -sf http://localhost:9093/-/healthy && echo "Alertmanager healthy" || echo "WARNING: Alertmanager not healthy"
+
+                        curl -sf http://localhost:9100/metrics | grep -q "node_cpu" \
+                            && echo "Node metrics available" \
+                            || echo "WARNING: Node metrics not available"
+
+                        curl -sf http://localhost:9090/api/v1/targets \
+                            | grep -q '"health":"up"' \
+                            && echo "Prometheus targets healthy" \
+                            || echo "WARNING: Some targets are down"
+
+                        curl -sf http://localhost:9090/api/v1/rules \
+                            | grep -q "HighCpuUsage" \
+                            && echo "Alert rules loaded" \
+                            || echo "WARNING: Alert rules not loaded"
                     '''
-                    // Provide information on how to access the monitoring tools and metrics.
-                    echo "Prometheus available at http://localhost:9090"
-                    echo "Grafana dashboard available at http://localhost:3001"
-                    echo "Metrics endpoint: http://localhost:9100/metrics"
+
+                    echo "Prometheus:    http://localhost:9090"
+                    echo "Grafana:       http://localhost:3001"
+                    echo "Alertmanager:  http://localhost:9093"
+                    echo "Node Exporter: http://localhost:9100/metrics"
                 }
             }
             post {
@@ -354,6 +377,7 @@ pipeline {
                 }
                 failure {
                     echo 'Monitoring setup failed.'
+                    sh 'docker rm -f prometheus grafana node-exporter alertmanager 2>/dev/null || true'
                 }
             }
         }
