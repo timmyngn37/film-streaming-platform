@@ -36,10 +36,10 @@ pipeline {
                         docker build -t "$IMAGE_BACKEND" ./backend
                         docker build -t "$IMAGE_FRONTEND" ./frontend
 
-                        docker images | grep "$BUILD_NUMBER" || true
+                        docker images | grep "$VERSION" || true
 
-                        docker save "$IMAGE_BACKEND" > backend-"$BUILD_NUMBER".tar
-                        docker save "$IMAGE_FRONTEND" > frontend-"$BUILD_NUMBER".tar
+                        docker save "$IMAGE_BACKEND" > backend-"$VERSION".tar
+                        docker save "$IMAGE_FRONTEND" > frontend-"$VERSION".tar
                     '''
                     // Save them as tar files for archiving.
                     archiveArtifacts artifacts: '*.tar', fingerprint: true
