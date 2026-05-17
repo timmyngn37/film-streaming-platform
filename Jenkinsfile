@@ -235,7 +235,7 @@ pipeline {
                         sleep 10
                         docker ps | grep my-backend || exit 1
                         docker ps | grep my-frontend || exit 1
-                        curl -f http://localhost:5000/health && echo "Backend API healthy" || exit 1
+                        curl -f http://host.docker.internal:5000/health && echo "Backend API healthy" || exit 1
                     '''
                 }
             }
