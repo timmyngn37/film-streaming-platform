@@ -554,7 +554,7 @@ pipeline {
         always {
             echo 'Cleaning up...'
             // Remove unused Docker images to free up disk space
-            docker image prune -f || true
+            sh 'docker image prune -f || true'
             // Use the cleanWs step to clean up the workspace after the pipeline completes  
             cleanWs(patterns: [[pattern: 'prometheus.yml', type: 'EXCLUDE']])
         }
