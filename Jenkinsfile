@@ -263,20 +263,49 @@ pipeline {
         }
 
         stage('Release Stage') {
+            when {
+                expression {
+                    def lastTag = sh(
+                        script: 'git describe --tags --abbrev=0 2>/dev/null || echo ""',
+                        returnStdout: true
+                    ).trim()
+
+                    if (!lastTag) return true
+
+                    def commitsSince = sh(
+                        script: "git rev-list ${lastTag}..HEAD --count",
+                        returnStdout: true
+                    ).trim().toInteger()
+
+                    return commitsSince > 0
+                }
+            }
             steps {
                 echo 'Releasing application...'
-                // Use withCredentials to securely access the GitHub token and create a new git tag for the release,
-                // then push it to the remote repository.
                 withCredentials([
-                    string(
-                        credentialsId: 'github-token',
-                        variable: 'GIT_TOKEN'
-                    )
+                    string(credentialsId: 'github-token', variable: 'GIT_TOKEN')
                 ]) {
                     sh '''
                         git config user.email "jenkins@ci.com"
                         git config user.name "Jenkins"
-                        git tag -a v$BUILD_NUMBER -m "Release version $BUILD_NUMBER"
+
+                        # Collect commit messages since last tag
+                        LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+
+                        if [ -z "$LAST_TAG" ]; then
+                            COMMIT_LOG=$(git log --oneline)
+                        else
+                            COMMIT_LOG=$(git log ${LAST_TAG}..HEAD --oneline)
+                        fi
+
+                        echo "Changes in this release:"
+                        echo "$COMMIT_LOG"
+
+                        git tag -a v$BUILD_NUMBER -m "Release version $BUILD_NUMBER
+
+            Changes:
+            $COMMIT_LOG"
+
                         git push https://timmyngn37:$GIT_TOKEN@github.com/timmyngn37/film-streaming-platform.git v$BUILD_NUMBER
                     '''
                 }
