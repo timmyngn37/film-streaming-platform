@@ -10,6 +10,10 @@ dotenv.config();
 
 const app = express();
 
+app.listen(5000, "0.0.0.0", () => {
+    console.log("Server running on port 5000");
+});
+
 promClient.collectDefaultMetrics();
 
 app.get('/metrics', async (req, res) => {
@@ -21,7 +25,11 @@ app.get('/health', (req, res) => {
     res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-app.use(cors());
+app.use(cors({
+    origin: true,
+    credentials: true
+}));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
