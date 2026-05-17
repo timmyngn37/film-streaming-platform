@@ -20,9 +20,9 @@ pipeline {
     }
     // environment block defines environment variables that will be available throughout the pipeline.
     environment {
-        VERSION = "${BUILD_NUMBER}"
-        IMAGE_BACKEND = "timmyngn/my-backend:${BUILD_NUMBER}"
-        IMAGE_FRONTEND = "timmyngn/my-frontend:${BUILD_NUMBER}"
+        VERSION = "latest"
+        IMAGE_BACKEND = "timmyngn/my-backend:latest"
+        IMAGE_FRONTEND = "timmyngn/my-frontend:latest"
     }
     // stages block defines the different stages of the pipeline. Each stage can have its own steps and post actions.
     stages {
@@ -360,9 +360,10 @@ pipeline {
                         docker rm -f node-exporter grafana prometheus 2>/dev/null || true
                         VERSION=$BUILD_NUMBER docker compose up -d sonarqube
                         sleep 30
-                        VERSION=$BUILD_NUMBER docker compose up -d --no-deps --force-recreate backend frontend
 
+                        docker compose up -d backend frontend
                         sleep 10
+
                         docker ps | grep my-backend || exit 1
                         docker ps | grep my-frontend || exit 1
                         curl -f http://host.docker.internal:5000/health && echo "Backend API healthy" || exit 1
