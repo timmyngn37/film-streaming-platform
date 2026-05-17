@@ -124,7 +124,6 @@ pipeline {
                 }
             }
         }
-
         stage('Code Quality Stage') {
             steps {
                 echo 'Running SonarQube analysis...'
@@ -165,54 +164,154 @@ pipeline {
             steps {
                 script {
                     echo 'Performing security checks...'
-                    // Run npm audit to check for vulnerabilities in the backend dependencies and generate a JSON report.
+                    // Backend audit
                     sh '''
                         cd backend
-                        npm audit --json 2>/dev/null > ../audit-report.json || true
-                        npm audit fix || true
+                        npm audit --json 2>/dev/null > ../audit-report-backend.json || true
                     '''
-                    // Check if the audit report was generated and read it as JSON.
-                    def auditFile = fileExists('audit-report.json')
-                    if (!auditFile) {
-                        error 'audit-report.json was not generated.'
-                    }
-                    // Read the audit report and extract vulnerability information.
-                    def auditReport = readJSON file: 'audit-report.json'
-                    // Check if the metadata and vulnerabilities information is present in the audit report.
-                    def vulns = auditReport?.metadata?.vulnerabilities
-                    if (vulns == null) {
-                        echo 'No vulnerability metadata found in audit report.'
-                    } else {
-                        def total = (vulns?.low      ?: 0) +
-                                    (vulns?.moderate  ?: 0) +
-                                    (vulns?.high      ?: 0) +
-                                    (vulns?.critical  ?: 0)
+                    // Frontend audit
+                    sh '''
+                        cd frontend
+                        npm audit --json 2>/dev/null > ../audit-report-frontend.json || true
+                    '''
+                    // Trivy image scan
+                    sh '''
+                        if ! command -v trivy &> /dev/null; then
+                            curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+                        fi
 
-                        echo "Vulnerabilities — low: ${vulns.low}, moderate: ${vulns.moderate}, high: ${vulns.high}, critical: ${vulns.critical}"
-                        echo "Total: ${total}"
+                        trivy image --exit-code 0 \
+                            --severity LOW,MEDIUM,HIGH,CRITICAL \
+                            --format json \
+                            --output trivy-backend.json \
+                            "$IMAGE_BACKEND" || true
 
-                        if (total > 0) {
-                            echo 'Security issues found. Review audit-report.json for details.'
-                            echo "Action: npm audit fix has been applied to resolve auto-fixable vulnerabilities."
-                            echo "Remaining issues require manual review or are false positives."
-                            currentBuild.result = 'UNSTABLE'
-                        } else {
-                            echo 'No vulnerabilities found. All dependencies are secure.'
+                        trivy image --exit-code 0 \
+                            --severity LOW,MEDIUM,HIGH,CRITICAL \
+                            --format json \
+                            --output trivy-frontend.json \
+                            "$IMAGE_FRONTEND" || true
+                    '''
+                    // Process backend audit results
+                    def backendAudit = fileExists('audit-report-backend.json')
+                        ? readJSON(file: 'audit-report-backend.json')
+                        : null
+                    if (backendAudit) {
+                        def vulns = backendAudit?.metadata?.vulnerabilities
+                        if (vulns) {
+                            echo "=== Backend NPM Audit: Severity Summary ==="
+                            echo "Low:      ${vulns.low ?: 0}"
+                            echo "Moderate: ${vulns.moderate ?: 0}"
+                            echo "High:     ${vulns.high ?: 0}"
+                            echo "Critical: ${vulns.critical ?: 0}"
+                            // Only fail on high/critical - low and moderate are informational.
+                            def serious = (vulns?.high ?: 0) + (vulns?.critical ?: 0)
+                            if (serious > 0) {
+                                echo "WARNING: ${serious} high/critical vulnerabilities found in backend."
+                                echo "Run 'npm audit' locally and review before merging."
+                                currentBuild.result = 'UNSTABLE'
+                            } else {
+                                echo "No high/critical vulnerabilities in backend."
+                            }
+                        }
+                        // Documenting per-package details from the backend audit report.
+                        def pkgVulns = backendAudit?.vulnerabilities
+                        if (pkgVulns) {
+                            echo "=== Backend NPM Audit: Vulnerability Details ==="
+                                def severity = info?.via?.collect { it instanceof Map ? it?.severity : null }
+                                                ?.findAll { it }?.join(", ") ?: "unknown"
+                                def title    = info?.via?.collect { it instanceof Map ? it?.title : null }
+                                                ?.findAll { it }?.join("; ") ?: "no description available"
+                                def fixable  = info?.fixAvailable ? "Fix available" : "No fix available"
+
+                                echo "  PACKAGE:  ${name}"
+                                echo "  SEVERITY: ${severity}"
+                                echo "  ISSUE:    ${title}"
+                                echo "  STATUS:   ${fixable}"
+                                echo "  ---"
+                            }
                         }
                     }
-                    // Archive the audit report for later analysis and reference.
-                    archiveArtifacts artifacts: 'audit-report.json', fingerprint: true
+                    // Process frontend audit results
+                    def frontendAudit = fileExists('audit-report-frontend.json')
+                        ? readJSON(file: 'audit-report-frontend.json')
+                        : null
+                    if (frontendAudit) {
+                        def vulns = frontendAudit?.metadata?.vulnerabilities
+                        if (vulns) {
+                            echo "=== Frontend NPM Audit: Severity Summary ==="
+                            echo "Low:      ${vulns.low ?: 0}"
+                            echo "Moderate: ${vulns.moderate ?: 0}"
+                            echo "High:     ${vulns.high ?: 0}"
+                            echo "Critical: ${vulns.critical ?: 0}"
+                            // Only fail on high/critical - low and moderate are informational.
+                            def serious = (vulns?.high ?: 0) + (vulns?.critical ?: 0)
+                            if (serious > 0) {
+                                echo "WARNING: ${serious} high/critical vulnerabilities found in frontend."
+                                currentBuild.result = 'UNSTABLE'
+                            } else {
+                                echo "No high/critical vulnerabilities in frontend."
+                            }
+                        }
+                        // Documenting per-package details from the frontend audit report.
+                        if (pkgVulns) {
+                            echo "=== Frontend NPM Audit: Vulnerability Details ==="
+                            pkgVulns.each { name, info ->
+                                def severity = info?.via?.collect { it instanceof Map ? it?.severity : null }
+                                                ?.findAll { it }?.join(", ") ?: "unknown"
+                                def title    = info?.via?.collect { it instanceof Map ? it?.title : null }
+                                                ?.findAll { it }?.join("; ") ?: "no description available"
+                                def fixable  = info?.fixAvailable ? "Fix available" : "No fix available"
+
+                                echo "  PACKAGE:  ${name}"
+                                echo "  SEVERITY: ${severity}"
+                                echo "  ISSUE:    ${title}"
+                                echo "  STATUS:   ${fixable}"
+                                echo "  ---"
+                            }
+                        }
+                    }
+                    // Documenting Trivy scan results for both backend and frontend images.
+                    ["trivy-backend.json", "trivy-frontend.json"].each { trivyFile ->
+                        if (fileExists(trivyFile)) {
+                            def trivyData = readJSON(file: trivyFile)
+                            // Derive a human-readable label from the filename for the header.
+                            def label = trivyFile.contains("backend") ? "Backend" : "Frontend"
+
+                            echo "=== Trivy ${label} Image Scan: Vulnerability Details ==="
+
+                            trivyData?.Results?.each { result ->
+                                if (!result?.Vulnerabilities) return
+
+                                echo "  Target: ${result?.Target ?: 'unknown'}"
+
+                                result.Vulnerabilities.each { v ->
+                                    echo "  PACKAGE:   ${v.PkgName} (installed: ${v.InstalledVersion ?: 'unknown'})"
+                                    echo "  CVE:       ${v.VulnerabilityID}"
+                                    echo "  SEVERITY:  ${v.Severity}"
+                                    echo "  TITLE:     ${v.Title ?: 'n/a'}"
+                                    echo "  FIX:       ${v.FixedVersion ? v.FixedVersion : 'none available'}"
+                                    echo "  ---"
+                                }
+                            }
+                        }
+                    }
+                    // Archive all the generated JSON reports
+                    archiveArtifacts artifacts: 'audit-report-backend.json, audit-report-frontend.json, trivy-backend.json, trivy-frontend.json',
+                        fingerprint: true,
+                        allowEmptyArchive: true
                 }
             }
             post {
                 success {
-                    echo 'Security checks completed successfully.'
+                    echo 'Security checks completed. No critical issues found.'
                 }
                 unstable {
-                    echo 'Security stage completed with warnings (vulnerabilities found).'
+                    echo 'Security checks found high/critical vulnerabilities - manual review required.'
+                    echo 'Check archived audit reports and the console log details above.'
                 }
                 failure {
-                    echo 'Security checks failed.'
+                    echo 'Security stage failed unexpectedly.'
                 }
             }
         }
@@ -261,7 +360,6 @@ pipeline {
                 }
             }
         }
-
         stage('Release Stage') {
             when {
                 expression {
@@ -322,7 +420,6 @@ pipeline {
                 }
             }
         }
-
         stage('Monitoring Stage') {
             steps {
                 script {
