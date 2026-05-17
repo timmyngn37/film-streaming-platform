@@ -198,6 +198,7 @@ pipeline {
                         : null
                     if (backendAudit) {
                         def vulns = backendAudit?.metadata?.vulnerabilities
+
                         if (vulns) {
                             echo "=== Backend NPM Audit: Severity Summary ==="
                             echo "Low:      ${vulns.low ?: 0}"
@@ -206,6 +207,7 @@ pipeline {
                             echo "Critical: ${vulns.critical ?: 0}"
                             // Only fail on high/critical - low and moderate are informational.
                             def serious = (vulns?.high ?: 0) + (vulns?.critical ?: 0)
+
                             if (serious > 0) {
                                 echo "WARNING: ${serious} high/critical vulnerabilities found in backend."
                                 echo "Run 'npm audit' locally and review before merging."
@@ -216,13 +218,22 @@ pipeline {
                         }
                         // Documenting per-package details from the backend audit report.
                         def pkgVulns = backendAudit?.vulnerabilities
+
                         if (pkgVulns) {
                             echo "=== Backend NPM Audit: Vulnerability Details ==="
-                                def severity = info?.via?.collect { it instanceof Map ? it?.severity : null }
-                                                ?.findAll { it }?.join(", ") ?: "unknown"
-                                def title    = info?.via?.collect { it instanceof Map ? it?.title : null }
-                                                ?.findAll { it }?.join("; ") ?: "no description available"
-                                def fixable  = info?.fixAvailable ? "Fix available" : "No fix available"
+
+                            pkgVulns.each { name, info ->
+                                def severity = info?.via?.collect {
+                                    it instanceof Map ? it?.severity : null
+                                }?.findAll { it }?.join(", ") ?: "unknown"
+
+                                def title = info?.via?.collect {
+                                    it instanceof Map ? it?.title : null
+                                }?.findAll { it }?.join("; ") ?: "no description available"
+
+                                def fixable = info?.fixAvailable
+                                    ? "Fix available"
+                                    : "No fix available"
 
                                 echo "  PACKAGE:  ${name}"
                                 echo "  SEVERITY: ${severity}"
@@ -238,7 +249,9 @@ pipeline {
                         : null
                     if (frontendAudit) {
                         def vulns = frontendAudit?.metadata?.vulnerabilities
+
                         if (vulns) {
+
                             echo "=== Frontend NPM Audit: Severity Summary ==="
                             echo "Low:      ${vulns.low ?: 0}"
                             echo "Moderate: ${vulns.moderate ?: 0}"
@@ -246,6 +259,7 @@ pipeline {
                             echo "Critical: ${vulns.critical ?: 0}"
                             // Only fail on high/critical - low and moderate are informational.
                             def serious = (vulns?.high ?: 0) + (vulns?.critical ?: 0)
+
                             if (serious > 0) {
                                 echo "WARNING: ${serious} high/critical vulnerabilities found in frontend."
                                 currentBuild.result = 'UNSTABLE'
@@ -253,15 +267,24 @@ pipeline {
                                 echo "No high/critical vulnerabilities in frontend."
                             }
                         }
-                        // Documenting per-package details from the frontend audit report.
+                        def pkgVulns = frontendAudit?.vulnerabilities
+
                         if (pkgVulns) {
+
                             echo "=== Frontend NPM Audit: Vulnerability Details ==="
+
                             pkgVulns.each { name, info ->
-                                def severity = info?.via?.collect { it instanceof Map ? it?.severity : null }
-                                                ?.findAll { it }?.join(", ") ?: "unknown"
-                                def title    = info?.via?.collect { it instanceof Map ? it?.title : null }
-                                                ?.findAll { it }?.join("; ") ?: "no description available"
-                                def fixable  = info?.fixAvailable ? "Fix available" : "No fix available"
+                                def severity = info?.via?.collect {
+                                    it instanceof Map ? it?.severity : null
+                                }?.findAll { it }?.join(", ") ?: "unknown"
+
+                                def title = info?.via?.collect {
+                                    it instanceof Map ? it?.title : null
+                                }?.findAll { it }?.join("; ") ?: "no description available"
+
+                                def fixable = info?.fixAvailable
+                                    ? "Fix available"
+                                    : "No fix available"
 
                                 echo "  PACKAGE:  ${name}"
                                 echo "  SEVERITY: ${severity}"
@@ -276,16 +299,22 @@ pipeline {
                         if (fileExists(trivyFile)) {
                             def trivyData = readJSON(file: trivyFile)
                             // Derive a human-readable label from the filename for the header.
-                            def label = trivyFile.contains("backend") ? "Backend" : "Frontend"
+                            def label = trivyFile.contains("backend")
+                                ? "Backend"
+                                : "Frontend"
 
                             echo "=== Trivy ${label} Image Scan: Vulnerability Details ==="
 
                             trivyData?.Results?.each { result ->
-                                if (!result?.Vulnerabilities) return
+
+                                if (!result?.Vulnerabilities) {
+                                    return
+                                }
 
                                 echo "  Target: ${result?.Target ?: 'unknown'}"
 
                                 result.Vulnerabilities.each { v ->
+
                                     echo "  PACKAGE:   ${v.PkgName} (installed: ${v.InstalledVersion ?: 'unknown'})"
                                     echo "  CVE:       ${v.VulnerabilityID}"
                                     echo "  SEVERITY:  ${v.Severity}"
@@ -297,9 +326,11 @@ pipeline {
                         }
                     }
                     // Archive all the generated JSON reports
-                    archiveArtifacts artifacts: 'audit-report-backend.json, audit-report-frontend.json, trivy-backend.json, trivy-frontend.json',
+                    archiveArtifacts(
+                        artifacts: 'audit-report-backend.json, audit-report-frontend.json, trivy-backend.json, trivy-frontend.json',
                         fingerprint: true,
                         allowEmptyArchive: true
+                    )
                 }
             }
             post {
