@@ -1,0 +1,15 @@
+global:
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_from: 'filmstreamingplatform@gmail.com'
+  smtp_auth_username: 'filmstreamingplatform@gmail.com'
+  smtp_auth_password: 'kdxc gbga wces spfx'
+
+route:
+  receiver: 'email-alert'
+
+receivers:
+  - name: 'email-alert'
+    email_configs:
+      - to: 'timmy.ngn.2006@gmail.com'
+        subject: 'Alert: {{ .GroupLabels.alertname }}'
+        body: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'

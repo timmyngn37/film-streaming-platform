@@ -71,6 +71,19 @@ services:
     networks:
       - devnet
     restart: unless-stopped
+  
+  alertmanager:
+    image: prom/alertmanager
+    container_name: alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - jenkins_home:/jenkins_home:ro
+    command:
+      - '--config.file=/jenkins_home/workspace/film-streaming-platform/alertmanager.yml'
+    networks:
+      - devnet
+    restart: unless-stopped
 
 networks:
   devnet:
