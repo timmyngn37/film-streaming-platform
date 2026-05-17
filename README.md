@@ -1,69 +1,133 @@
 # 🎬 Film Streaming Platform
 
-> **Educational purposes only** — This project is built for learning full-stack web development.
+> **Educational DevOps Project** — A full-stack film streaming platform built for learning modern web development, CI/CD, Docker containerization, security scanning, and observability.
 
-## Overview
+---
 
-A full-stack film streaming platform where admins can manage films (upload, edit, delete) and users can browse and watch them.
+## 📌 Overview
 
-## Tech Stack
+This project is a full-stack film streaming platform where:
 
-**Frontend**
+- 👨‍💻 Admins can manage films (create, update, delete, upload media)
+- 👀 Users can browse and watch films
+- 🔐 Authentication & role-based access control (JWT)
+- 🚀 Fully containerized with Docker & automated CI/CD using Jenkins
+- 📊 Integrated monitoring & security tools
+
+---
+
+## 🧱 Tech Stack
+
+### 🎨 Frontend
 - React (Vite)
 - Axios
 - CSS
+- Built as static assets
+- Served via Nginx (production)
 
-**Backend**
+### ⚙️ Backend
 - Node.js + Express
 - MongoDB + Mongoose
 - JWT Authentication
-- Cloudinary (image & video storage)
-- Multer (file upload)
+- Multer (file uploads)
+- Cloudinary (image/video storage)
 
-## Features
+### 🐳 DevOps / Infrastructure
+- Docker & Docker Compose
+- Jenkins CI/CD Pipeline
+- SonarQube (Code Quality Analysis)
+- Trivy (Container Security Scanning)
+- Prometheus (Metrics collection)
+- Grafana (Visualization dashboard)
+- Alertmanager (Alerting system)
+- Node Exporter (Host metrics)
 
-- User authentication (login/register)
-- JWT-based authorization
-- Role-based access control (admin/user)
-- Upload film thumbnail and video to Cloudinary
-- Browse and watch films
-- Admin panel: create, edit, delete films
+---
 
-## Project Structure
+## 🏗️ Architecture
 ```
-film-streaming-platform/
-├── backend/
-│   ├── src/
-│   │   ├── config/
-│   │   ├── controllers/
-│   │   ├── middleware/
-│   │   ├── models/
-│   │   ├── routes/
-│   │   ├── app.js
-│   │   └── server.js
-│   └── package.json
-└── frontend/
-    ├── src/
-    │   ├── pages/
-    │   ├── services/
-    │   └── App.css
-    └── package.json
+Browser
+↓
+Frontend (Nginx container :5173 → 80)
+↓
+Backend API (Node.js :5000)
+↓
+MongoDB + Cloud storage (Cloudinary)
 ```
 
-## Getting Started
+---
 
-### Prerequisites
-- Node.js
-- MongoDB (local or Atlas)
-- Cloudinary account
-
-### Backend Setup
-```bash
-cd backend
-npm install
+## 🚀 CI/CD Pipeline Flow
+```
+Git Push
+↓
+Jenkins Pipeline Trigger
+↓
+Build Docker Images
+↓
+Run Tests
+↓
+SonarQube Quality Gate
+↓
+Security Scan (npm audit + Trivy)
+↓
+Push Images to Docker Hub
+↓
+Deploy via Docker Compose
+↓
+Monitoring Stack (Prometheus + Grafana)
 ```
 
-Create `.env` file:
+---
+
+## 🌐 Ports Mapping
+
+| Service        | Port Mapping |
+|----------------|-------------|
+| Frontend       | 5173:80     |
+| Backend        | 5000:5000   |
+| SonarQube      | 9000:9000   |
+| Prometheus     | 9090:9090   |
+| Grafana        | 3001:3000   |
+| Alertmanager   | 9093:9093   |
+| Node Exporter  | 9100:9100   |
+
+---
+
+## ✨ Features
+
+### 🔐 Authentication
+- User register/login
+- JWT-based authentication
+- Role-based access (Admin/User)
+
+### 🎬 Film Management
+- Upload film thumbnail & video
+- Store media on Cloudinary
+- CRUD operations (admin only)
+
+### 📺 Streaming
+- Browse films
+- Watch video content
+
+### 📊 DevOps Features
+- CI/CD automation (Jenkins)
+- Code quality checks (SonarQube)
+- Security scanning (Trivy + npm audit)
+- Monitoring stack (Grafana + Prometheus)
+
+---
+
+## 🐳 Docker Setup
+```
+docker compose up -d --build
+docker compose down
+```
+
+---
+
+## 📦 Environment Variables
+Create ```.env``` file in ```/backend```:
 ```
 MONGODB_URI=your_mongodb_uri
 JWT_SECRET=your_jwt_secret
@@ -73,17 +137,7 @@ CLOUDINARY_API_SECRET=your_api_secret
 PORT=5000
 ```
 
-```bash
-npm run dev
-```
+---
 
-### Frontend Setup
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-## Disclaimer
-
+## 📌 Disclaimer
 This project is created for **educational purposes only** (with the assistance of artificial intelligence). All content uploaded during development is for testing and learning. Not intended for commercial use.
