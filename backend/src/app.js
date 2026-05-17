@@ -17,6 +17,10 @@ app.get('/metrics', async (req, res) => {
     res.end(await promClient.register.metrics());
 });
 
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
