@@ -466,7 +466,7 @@ pipeline {
 
                         # Promethus health check with retries
                         for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
-                            if curl -sf http://localhost:9090/-/healthy; then
+                            if curl -sf http://host.docker.internal:9090/-/healthy; then
                                 echo "Prometheus healthy"
                                 break
                             fi
@@ -477,14 +477,13 @@ pipeline {
                             if [ $i -eq 12 ]; then
                                 echo "ERROR: Prometheus not healthy"
                                 docker logs prometheus --tail 100 || true
-                                docker ps -a || true
                                 exit 1
                             fi
                         done
 
                         # Grafana health check with retries
                         for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
-                            if curl -sf http://localhost:3001/api/health | grep -q "ok"; then
+                            if curl -sf http://host.docker.internal:3001/api/health | grep -q "ok"; then
                                 echo "Grafana healthy"
                                 break
                             fi
@@ -495,30 +494,29 @@ pipeline {
                             if [ $i -eq 12 ]; then
                                 echo "ERROR: Grafana not healthy"
                                 docker logs grafana --tail 100 || true
-                                docker ps -a || true
                                 exit 1
                             fi
                         done
 
                         # Alertmanager health check
-                        curl -sf http://localhost:9093/-/healthy \
+                        curl -sf http://host.docker.internal:9093/-/healthy \
                             && echo "Alertmanager healthy" \
                             || echo "WARNING: Alertmanager not healthy"
 
                         # Node Exporter metrics check
-                        curl -sf http://localhost:9100/metrics \
+                        curl -sf http://host.docker.internal:9100/metrics \
                             | grep -q "node_cpu" \
                             && echo "Node metrics available" \
                             || echo "WARNING: Node metrics not available"
 
                         # Promethus targets check
-                        curl -sf http://localhost:9090/api/v1/targets \
+                        curl -sf http://host.docker.internal:9090/api/v1/targets \
                             | grep -q '"health":"up"' \
                             && echo "Prometheus targets healthy" \
                             || echo "WARNING: Some targets are down"
 
                         # Alert rules check
-                        curl -sf http://localhost:9090/api/v1/rules \
+                        curl -sf http://host.docker.internal:9090/api/v1/rules \
                             | grep -q "HighCpuUsage" \
                             && echo "Alert rules loaded" \
                             || echo "WARNING: Alert rules not loaded"
@@ -543,8 +541,6 @@ pipeline {
                         docker logs grafana 2>/dev/null || true
                         docker logs alertmanager 2>/dev/null || true
                         docker logs node-exporter 2>/dev/null || true
-
-                        docker ps -a || true
                     '''
                     sh '''
                         docker rm -f prometheus grafana node-exporter alertmanager 2>/dev/null || true
