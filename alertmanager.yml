@@ -3,6 +3,7 @@ global:
   smtp_from: 'filmstreamingplatform@gmail.com'
   smtp_auth_username: 'filmstreamingplatform@gmail.com'
   smtp_auth_password: 'kdxc gbga wces spfx'
+  smtp_require_tls: true
 
 route:
   receiver: 'email-alert'
@@ -11,5 +12,3 @@ receivers:
   - name: 'email-alert'
     email_configs:
       - to: 'timmy.ngn.2006@gmail.com'
-        subject: 'Alert: {{ .GroupLabels.alertname }}'
-        body: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
