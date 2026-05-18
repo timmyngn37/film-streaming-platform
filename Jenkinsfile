@@ -63,6 +63,27 @@ pipeline {
 
                                 docker push "$IMAGE_BACKEND"
                                 docker push "$IMAGE_FRONTEND"
+                                
+                                TOKEN=$(curl -s -X POST \
+                                    -H "Content-Type: application/json" \
+                                    -d "{\"username\": \"$USER\", \"password\": \"$PASS\"}" \
+                                    https://hub.docker.com/v2/users/login/ \
+                                    | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
+
+                                for REPO in my-backend my-frontend; do
+                                    TAGS=$(curl -s "https://hub.docker.com/v2/repositories/timmyngn/${REPO}/tags/?page_size=100" \
+                                        | grep -o '"name":"[^"]*"' \
+                                        | grep -o '[0-9]*' \
+                                        | sort -rn \
+                                        | tail -n +6)
+
+                                    for TAG in $TAGS; do
+                                        echo "Deleting timmyngn/${REPO}:${TAG}"
+                                        curl -X DELETE \
+                                            -H "Authorization: Bearer $TOKEN" \
+                                            "https://hub.docker.com/v2/repositories/timmyngn/${REPO}/tags/${TAG}/"
+                                    done
+                                done
                             '''
                         }
                     }
