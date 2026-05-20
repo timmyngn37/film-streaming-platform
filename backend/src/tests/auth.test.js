@@ -104,3 +104,18 @@ describe('Unit - User Model', () => {
         expect(result).toBe(false);
     });
 });
+
+describe('GET /health', () => {
+    it('should return status ok', async () => {
+        const res = await request(app).get('/health');
+        expect(res.statusCode).toBe(200);
+        expect(res.body.status).toBe('ok');
+    });
+});
+
+describe('GET /metrics', () => {
+    it('should return prometheus metrics', async () => {
+        const res = await request(app).get('/metrics');
+        expect(res.statusCode).toBe(200);
+    });
+});
