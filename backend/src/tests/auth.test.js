@@ -77,5 +77,30 @@ describe('POST /api/login', () => {
             .post('/api/login')
             .send({ username: 'nobody', password: 'password123' });
         expect(res.statusCode).toBe(401);
+        expect(res.body.error).toBe('Invalid login credentials');
+    });
+});
+
+// Thêm vào cuối file auth.test.js, sau describe('POST /api/login')
+
+describe('Unit - User Model', () => {
+    it('should hash password before saving', async () => {
+        const user = new User({ username: 'hashtest', password: 'plaintext' });
+        await user.save();
+        expect(user.password).not.toBe('plaintext');
+    });
+
+    it('should return true for correct password', async () => {
+        const user = new User({ username: 'comparetest', password: 'mypassword' });
+        await user.save();
+        const result = await user.comparePassword('mypassword');
+        expect(result).toBe(true);
+    });
+
+    it('should return false for incorrect password', async () => {
+        const user = new User({ username: 'comparetest2', password: 'mypassword' });
+        await user.save();
+        const result = await user.comparePassword('wrongpassword');
+        expect(result).toBe(false);
     });
 });
