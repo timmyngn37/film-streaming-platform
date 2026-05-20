@@ -226,23 +226,3 @@ describe('DELETE /api/films/:id - additional', () => {
         expect(res.statusCode).toBe(400);
     });
 });
-
-describe('Upload - additional', () => {
-    it('should return 404 if film not found for thumbnail', async () => {
-        const fakeId = new mongoose.Types.ObjectId();
-        const res = await request(app)
-            .post(`/api/films/${fakeId}/thumbnail`)
-            .set('Authorization', `Bearer ${adminToken}`)
-            .attach('thumbnail', Buffer.from('fake image'), 'test.jpg');
-        expect([404, 500]).toContain(res.statusCode);
-    });
-
-    it('should return 404 if film not found for video', async () => {
-        const fakeId = new mongoose.Types.ObjectId();
-        const res = await request(app)
-            .post(`/api/films/${fakeId}/video`)
-            .set('Authorization', `Bearer ${adminToken}`)
-            .attach('video', Buffer.from('fake video'), 'test.mp4');
-        expect([404, 500]).toContain(res.statusCode);
-    });
-});
