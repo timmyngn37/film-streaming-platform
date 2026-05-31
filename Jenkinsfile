@@ -41,14 +41,13 @@ pipeline {
                         docker save "$IMAGE_BACKEND" > backend-"$VERSION".tar
                         docker save "$IMAGE_FRONTEND" > frontend-"$VERSION".tar
                     '''
-                    // Save them as tar files for archiving.
+                    // Archive tar files here, and archived there after it has been created.
                     archiveArtifacts artifacts: '*.tar', fingerprint: true
                 }
             }
             post {
                 success {
                     echo 'Build succeeded. Logging into Docker Hub and pushing images...'
-                    // Use withCredentials to securely access Docker Hub credentials and push the built images.
                     script {
                         withCredentials([
                             usernamePassword(
@@ -62,7 +61,16 @@ pipeline {
 
                                 docker push "$IMAGE_BACKEND"
                                 docker push "$IMAGE_FRONTEND"
-                                
+
+                                # Push latest tag alongside the versioned tag.
+                                docker tag "$IMAGE_BACKEND" timmyngn/my-backend:latest
+                                docker tag "$IMAGE_FRONTEND" timmyngn/my-frontend:latest
+                                docker push timmyngn/my-backend:latest
+                                docker push timmyngn/my-frontend:latest
+                                echo "Pushed versioned tags: $BUILD_NUMBER and convenience tag: latest"
+
+                                # Registry retention policy: keep only the 5 most recent tags on Docker Hub.
+                                # Full audit trail is preserved via build-manifest.txt in Jenkins artifacts.
                                 TOKEN=$(curl -s -X POST \
                                     -H "Content-Type: application/json" \
                                     -d "{\"username\": \"$USER\", \"password\": \"$PASS\"}" \
@@ -77,13 +85,34 @@ pipeline {
                                         | tail -n +6)
 
                                     for TAG in $TAGS; do
-                                        echo "Deleting timmyngn/${REPO}:${TAG}"
+                                        echo "[Retention] Removing timmyngn/${REPO}:${TAG} — only 5 latest tags kept on registry"
                                         curl -X DELETE \
                                             -H "Authorization: Bearer $TOKEN" \
                                             "https://hub.docker.com/v2/repositories/timmyngn/${REPO}/tags/${TAG}/"
                                     done
                                 done
                             '''
+
+                            // Write manifest using Groovy after the shell block completes.
+                            def gitCommit = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+                            def gitBranch = sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim()
+                            def buildDate = sh(script: 'date -u +"%Y-%m-%dT%H:%M:%SZ"', returnStdout: true).trim()
+
+                            writeFile(file: 'build-manifest.txt', text:
+                                "Build Number  : ${BUILD_NUMBER}\n" +
+                                "Build Date    : ${buildDate}\n" +
+                                "Git Commit    : ${gitCommit}\n" +
+                                "Git Branch    : ${gitBranch}\n" +
+                                "Backend Image : ${IMAGE_BACKEND}\n" +
+                                "Frontend Image: ${IMAGE_FRONTEND}\n" +
+                                "Retention     : 5 most recent tags kept on Docker Hub\n"
+                        )
+
+                            echo "Build manifest written:"
+                            echo readFile('build-manifest.txt')
+
+                            // Archive manifest now that it exists.
+                            archiveArtifacts artifacts: 'build-manifest.txt', fingerprint: true
                         }
                     }
                 }
