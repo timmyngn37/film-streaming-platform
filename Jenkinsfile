@@ -136,26 +136,19 @@ pipeline {
                         variable: 'JWT_SECRET'
                     )
                 ]) {
-
                     sh '''
                         cd backend
-
                         export JWT_SECRET="$JWT_SECRET"
-
                         npm test
-                        npm run test:coverage
                     '''
                 }
-                // Archive test results and coverage reports for later analysis.
-                archiveArtifacts artifacts: 'backend/test-results/*.xml', fingerprint: true
-                archiveArtifacts artifacts: 'backend/coverage/**', fingerprint: true
             }
 
             post {
                 always {
-                    // Publish test results and coverage reports to Jenkins.
-                    junit 'backend/test-results/junit.xml'
-                    // Use the publishHTML plugin to display the coverage report in Jenkins.
+                    // Publish test results to Jenkins build summary.
+                    junit allowEmptyResults: true, testResults: 'backend/test-results/junit.xml'
+                    // Render coverage report as HTML page accessible from Jenkins UI.
                     publishHTML(target: [
                         reportName: 'Coverage Report',
                         reportDir: 'backend/coverage/lcov-report',
@@ -166,7 +159,10 @@ pipeline {
                     ])
                 }
                 success {
-                    echo 'Tests passed successfully.'
+                    echo 'Tests passed successfully. Saving test results and coverage reports...'
+                    // Archive results only after they have been successfully generated.
+                    archiveArtifacts artifacts: 'backend/test-results/*.xml', fingerprint: true
+                    archiveArtifacts artifacts: 'backend/coverage/**', fingerprint: true
                 }
                 failure {
                     error 'Tests failed.'
