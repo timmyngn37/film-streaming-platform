@@ -95,7 +95,7 @@ pipeline {
 
                             // Write manifest using Groovy after the shell block completes.
                             def gitCommit = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
-                            def gitBranch = sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim()
+                            def gitBranch = env.GIT_BRANCH?.replaceFirst('origin/', '') ?: 'main'
                             def buildDate = sh(script: 'date -u +"%Y-%m-%dT%H:%M:%SZ"', returnStdout: true).trim()
 
                             writeFile(file: 'build-manifest.txt', text:
