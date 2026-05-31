@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
-    "test": "jest --coverage --reporters=default --reporters=jest-junit --forceExit --detectOpenHandles",
+    "test": "jest --coverage --reporters=default --reporters=jest-junit --forceExit --detectOpenHandles"
   },
   "keywords": [],
   "author": "",
