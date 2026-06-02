@@ -492,14 +492,27 @@ pipeline {
             $COMMIT_LOG"
 
                         git push https://timmyngn37:$GIT_TOKEN@github.com/timmyngn37/film-streaming-platform.git v$BUILD_NUMBER
+                        COMMIT_LOG_ESCAPED=$(echo "$COMMIT_LOG" \
+                            | sed 's/\\/\\\\/g; s/"/\\"/g' \
+                            | awk '{printf "%s\\n", $0}' \
+                            | sed '$ s/\\n$//')
+                        
+                        # Create GitHub Release via API
+                        RELEASE_RESPONSE=$(curl -s -X POST \
+                            -H "Authorization: token $GIT_TOKEN" \
+                            -H "Content-Type: application/json" \
+                            -d "{\"tag_name\": \"v$BUILD_NUMBER\", \"name\": \"Release v$BUILD_NUMBER\", \"body\": \"$COMMIT_LOG_ESCAPED\", \"draft\": false, \"prerelease\": false}" \
+                            https://api.github.com/repos/timmyngn37/film-streaming-platform/releases)
+                        RELEASE_URL=$(echo "$RELEASE_RESPONSE" | grep -o '"html_url":"[^"]*"' | head -1 | cut -d'"' -f4)
+                        echo "GitHub Release created: $RELEASE_URL"
                     '''
                 }
             }
             post {
                 success {
-                    echo "Release v${BUILD_NUMBER} completed successfully."
-                    echo "Environment: production"
-                    echo "Backend image: ${IMAGE_BACKEND}"
+                    echo "Release v${BUILD_NUMBER} tagged and published to GitHub."
+                    echo "Release URL: https://github.com/timmyngn37/film-streaming-platform/releases/tag/v${BUILD_NUMBER}"
+                    echo "Backend image : ${IMAGE_BACKEND}"
                     echo "Frontend image: ${IMAGE_FRONTEND}"
                 }
                 failure {
