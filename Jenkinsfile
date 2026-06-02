@@ -117,7 +117,7 @@ pipeline {
                     }
                 }
                 failure {
-                    echo 'Build failed.'
+                    echo 'Build failed. Check Docker build logs above for image build or push errors.'
                 }
             }
         }
@@ -165,7 +165,7 @@ pipeline {
                     archiveArtifacts artifacts: 'backend/coverage/**', fingerprint: true
                 }
                 failure {
-                    error 'Tests failed.'
+                    error 'Tests failed. Pipeline halted to prevent broken build from proceeding.'
                 }
             }
         }
@@ -183,10 +183,8 @@ pipeline {
                         """
                     }
                     // Wait for SonarQube analysis to complete and check the quality gate status.
-                    sleep(time: 10, unit: 'SECONDS')
-                    // Use a timeout to avoid waiting indefinitely for the quality gate result.
                     timeout(time: 3, unit: 'MINUTES') {
-                        def qg = waitForQualityGate()
+                        def qg = waitForQualityGate abortPipeline: false
                         echo "Quality Gate status: ${qg.status}"
                         if (qg.status != 'OK') {
                             error "Quality Gate failed: ${qg.status}"
@@ -201,7 +199,7 @@ pipeline {
                     echo 'SonarQube analysis completed successfully.'
                 }
                 failure {
-                    echo 'SonarQube analysis failed.'
+                    echo 'SonarQube analysis failed. Check the SonarQube dashboard for quality gate details.'
                 }
             }
         }
