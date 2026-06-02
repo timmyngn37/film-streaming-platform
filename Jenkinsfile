@@ -526,14 +526,16 @@ pipeline {
                     echo 'Configuring monitoring...'
 
                     sh '''
-                        docker rm -f node-exporter grafana prometheus alertmanager 2>/dev/null || true
+                    
+                        docker compose stop prometheus grafana node-exporter alertmanager 2>/dev/null || true
+                        docker compose rm -f prometheus grafana node-exporter alertmanager 2>/dev/null || true
                         VERSION=$BUILD_NUMBER docker compose up -d prometheus grafana node-exporter alertmanager
 
                         echo "Waiting for services to start..."
 
                         sleep 30
 
-                        # Promethus health check with retries
+                        # Prometheus health check with retries
                         for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
                             if curl -sf http://host.docker.internal:9090/-/healthy; then
                                 echo "Prometheus healthy"
@@ -578,7 +580,7 @@ pipeline {
                             && echo "Node metrics available" \
                             || echo "WARNING: Node metrics not available"
 
-                        # Promethus targets check
+                        # Prometheus targets check
                         curl -sf http://host.docker.internal:9090/api/v1/targets \
                             | grep -q '"health":"up"' \
                             && echo "Prometheus targets healthy" \
@@ -600,7 +602,7 @@ pipeline {
 
             post {
                 success {
-                    echo 'Monitoring configured successfully.'
+                    echo "Monitoring stack healthy. Prometheus, Grafana, Alertmanager and Node Exporter running for build ${BUILD_NUMBER}."
                 }
 
                 failure {
