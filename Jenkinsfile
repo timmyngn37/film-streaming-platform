@@ -498,15 +498,14 @@ pipeline {
 
                         # Build JSON body safely using Python
                         BODY=$(python3 -c "
-                    import json, sys
-                    tag = 'v$BUILD_NUMBER'
-                    body = sys.stdin.read()
-                    print(json.dumps({'tag_name': tag, 'name': 'Release ' + tag, 'body': body, 'draft': False, 'prerelease': False}))
-                    " <<'EOF'
-                    $COMMIT_LOG
-                    EOF
-                    )
-
+import json, sys
+tag = 'v$BUILD_NUMBER'
+body = sys.stdin.read().strip()
+print(json.dumps({'tag_name': tag, 'name': 'Release ' + tag, 'body': body, 'draft': False, 'prerelease': False}))
+" << EOF
+$COMMIT_LOG
+EOF
+)
                         # Create GitHub Release via API
                         RELEASE_RESPONSE=$(curl -s -X POST \
                             -H "Authorization: token $GIT_TOKEN" \
