@@ -474,6 +474,11 @@ pipeline {
                     string(credentialsId: 'github-token', variable: 'GIT_TOKEN')
                 ]) {
                     sh '''
+                        # Install jq if not present
+                        if ! command -v jq &> /dev/null; then
+                            apt-get install -y jq 2>/dev/null || apk add jq 2>/dev/null || true
+                        fi
+                        
                         git config user.email "jenkins@ci.com"
                         git config user.name "Jenkins"
 
