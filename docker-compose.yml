@@ -5,7 +5,7 @@ services:
     image: sonarqube:community
     container_name: sonarqube
     environment:
-    - SONAR_WEB_SESSIONTIMEOUTINMINUTES=43200
+      - SONAR_WEB_SESSIONTIMEOUTINMINUTES=43200
     ports:
       - "9000:9000"
     networks:
@@ -16,7 +16,7 @@ services:
       - sonarqube_extensions:/opt/sonarqube/extensions
 
   backend:
-    image: timmyngn/my-backend:latest
+    image: timmyngn/my-backend:${VERSION:-latest}
     container_name: my-backend
     ports:
       - "5000:5000"
@@ -24,12 +24,10 @@ services:
       - ./backend/.env
     networks:
       - devnet
-    depends_on:
-      - sonarqube
     restart: unless-stopped
 
   frontend:
-    image: timmyngn/my-frontend:latest
+    image: timmyngn/my-frontend:${VERSION:-latest}
     container_name: my-frontend
     ports:
       - "5173:80"
@@ -46,6 +44,7 @@ services:
       - "9090:9090"
     volumes:
       - jenkins_home:/jenkins_home:ro
+      - prometheus_data:/prometheus
     command:
       - '--config.file=/jenkins_home/workspace/film-streaming-platform/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
@@ -59,6 +58,8 @@ services:
     container_name: grafana
     ports:
       - "3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
     networks:
       - devnet
     restart: unless-stopped
@@ -71,7 +72,7 @@ services:
     networks:
       - devnet
     restart: unless-stopped
-  
+
   alertmanager:
     image: prom/alertmanager
     container_name: alertmanager
@@ -94,3 +95,5 @@ volumes:
   sonarqube_extensions:
   jenkins_home:
     external: true
+  prometheus_data:
+  grafana_data:
