@@ -604,6 +604,23 @@ EOF
                             || echo "WARNING: Alert rules not loaded"
                     '''
 
+                    echo 'Simulating incident by stopping backend service to trigger alert...'
+                    sh 'docker compose stop backend'
+                    
+                    boolean alertFired = false
+                    for (int i = 0; i < 12; i++) {
+                        def checkAlert = sh(script: "curl -s http://localhost:9093/api/v1/alerts | grep -q 'ServiceDown' && echo 'FIRING' || echo 'PENDING'", returnStdout: true).trim()
+                        if (checkAlert == 'FIRING') {
+                            alertFired = true
+                            break
+                        }
+                        sleep 5
+                    }
+                    sh 'docker compose start backend'
+                    if (!alertFired) {
+                        echo "Warning: Incident simulation timed out before Alertmanager registered firing state."
+                    }
+
                     echo "Prometheus:    http://localhost:9090"
                     echo "Grafana:       http://localhost:3001"
                     echo "Alertmanager:  http://localhost:9093"
