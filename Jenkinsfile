@@ -24,7 +24,6 @@ pipeline {
         IMAGE_BACKEND = "timmyngn/my-backend:${VERSION}"
         IMAGE_FRONTEND = "timmyngn/my-frontend:${VERSION}"
     }
-    // stages block defines the different stages of the pipeline. Each stage can have its own steps and post actions.
     stages {
         stage('Build Stage') {
             steps {
@@ -41,7 +40,8 @@ pipeline {
                         docker save "$IMAGE_BACKEND" > backend-"$VERSION".tar
                         docker save "$IMAGE_FRONTEND" > frontend-"$VERSION".tar
                     '''
-                    // Archive tar files here, and archived there after it has been created.
+                    // Archive tar files only here — manifest is written in post{success}
+                    // and archived there, after it has been created.
                     archiveArtifacts artifacts: '*.tar', fingerprint: true
                 }
             }
@@ -106,7 +106,7 @@ pipeline {
                                 "Backend Image : ${IMAGE_BACKEND}\n" +
                                 "Frontend Image: ${IMAGE_FRONTEND}\n" +
                                 "Retention     : 5 most recent tags kept on Docker Hub\n"
-                        )
+                            )
 
                             echo "Build manifest written:"
                             echo readFile('build-manifest.txt')
@@ -141,9 +141,10 @@ pipeline {
                         export JWT_SECRET="$JWT_SECRET"
                         npm test
                     '''
+                    // npm test runs jest --coverage --testResultsProcessor=jest-junit in one pass.
+                    // Coverage and test results are generated together, no duplicate run needed.
                 }
             }
-
             post {
                 always {
                     // Publish test results to Jenkins build summary.
@@ -159,7 +160,7 @@ pipeline {
                     ])
                 }
                 success {
-                    echo 'Tests passed successfully. Saving test results and coverage reports...'
+                    echo 'Tests passed successfully.'
                     // Archive results only after they have been successfully generated.
                     archiveArtifacts artifacts: 'backend/test-results/*.xml', fingerprint: true
                     archiveArtifacts artifacts: 'backend/coverage/**', fingerprint: true
@@ -183,6 +184,7 @@ pipeline {
                         """
                     }
                     // Wait for SonarQube analysis to complete and check the quality gate status.
+                    // Use a timeout to avoid waiting indefinitely for the quality gate result.
                     timeout(time: 3, unit: 'MINUTES') {
                         def qg = waitForQualityGate abortPipeline: false
                         echo "Quality Gate status: ${qg.status}"
@@ -294,7 +296,6 @@ pipeline {
                         def vulns = frontendAudit?.metadata?.vulnerabilities
 
                         if (vulns) {
-
                             echo "=== Frontend NPM Audit: Severity Summary ==="
                             echo "Low:      ${vulns.low ?: 0}"
                             echo "Moderate: ${vulns.moderate ?: 0}"
@@ -313,7 +314,6 @@ pipeline {
                         def pkgVulns = frontendAudit?.vulnerabilities
 
                         if (pkgVulns) {
-
                             echo "=== Frontend NPM Audit: Vulnerability Details ==="
 
                             pkgVulns.each { name, info ->
@@ -357,7 +357,6 @@ pipeline {
                                 echo "  Target: ${result?.Target ?: 'unknown'}"
 
                                 result.Vulnerabilities.each { v ->
-
                                     echo "  PACKAGE:   ${v.PkgName} (installed: ${v.InstalledVersion ?: 'unknown'})"
                                     echo "  CVE:       ${v.VulnerabilityID}"
                                     echo "  SEVERITY:  ${v.Severity}"
@@ -372,7 +371,7 @@ pipeline {
             }
             post {
                 always {
-                    // Archive all the generated JSON reports
+                    // Archive all generated JSON reports regardless of outcome.
                     archiveArtifacts(
                         artifacts: 'audit-report-backend.json, audit-report-frontend.json, trivy-backend.json, trivy-frontend.json',
                         fingerprint: true,
@@ -395,18 +394,21 @@ pipeline {
             steps {
                 script {
                     echo 'Deploying application...'
-                    // Save the current image version for potential rollback, copy environment variables, and deploy using Docker Compose.
+                    // Save current image version for rollback, inject env vars, deploy.
                     sh '''
                         CURRENT=$(docker inspect --format='{{.Config.Image}}' my-backend 2>/dev/null || echo "none")
                         echo $CURRENT > .previous_version
 
                         cp /var/jenkins_home/.env backend/.env
 
+                        # Remove monitoring containers before deploying app.
                         docker rm -f node-exporter grafana prometheus 2>/dev/null || true
-                        
+
+                        # Deploy backend and frontend with versioned image tags.
                         VERSION=$BUILD_NUMBER docker compose up -d backend frontend
                         sleep 10
 
+                        # Health checks to confirm deployment succeeded.
                         docker ps | grep my-backend || exit 1
                         docker ps | grep my-frontend || exit 1
                         curl -f http://host.docker.internal:5000/health && echo "Backend API healthy" || exit 1
@@ -416,34 +418,33 @@ pipeline {
             post {
                 failure {
                     echo 'Deployment failed. Rolling back...'
-                    // If deployment fails, read the previous version from the file and roll back to it using Docker Compose.
                     sh '''
                         if [ ! -f .previous_version ]; then
                             echo "No previous version recorded, skipping rollback."
                             exit 0
                         fi
-                        
-                    PREVIOUS=$(cat .previous_version)
-                    if [ -z "$PREVIOUS" ] || [ "$PREVIOUS" = "none" ]; then
-                        echo "No valid previous version found, skipping rollback."
-                        exit 0
-                    fi
-                    echo "Rolling back to: $PREVIOUS"
 
-                   docker compose down --remove-orphans || true
-                   docker rm -f node-exporter grafana prometheus 2>/dev/null || true
-                   
-                   sed -i "s|$IMAGE_BACKEND|$PREVIOUS|g" docker-compose.yml
-                   VERSION=$BUILD_NUMBER docker compose up -d backend frontend
-                   sleep 10
+                        PREVIOUS=$(cat .previous_version)
+                        if [ -z "$PREVIOUS" ] || [ "$PREVIOUS" = "none" ]; then
+                            echo "No valid previous version found, skipping rollback."
+                            exit 0
+                        fi
 
-                    curl -f http://host.docker.internal:5000/health \
-                    && echo "Rollback successful to $PREVIOUS" \
-                    || echo "Rollback health check failed"
+                        echo "Rolling back to: $PREVIOUS"
+                        docker compose down --remove-orphans || true
+                        docker rm -f node-exporter grafana prometheus 2>/dev/null || true
+
+                        sed -i "s|$IMAGE_BACKEND|$PREVIOUS|g" docker-compose.yml
+                        VERSION=$BUILD_NUMBER docker compose up -d backend frontend
+                        sleep 10
+
+                        curl -f http://host.docker.internal:5000/health \
+                            && echo "Rollback successful to $PREVIOUS" \
+                            || echo "Rollback health check failed"
                     '''
                 }
                 success {
-                    echo 'Deployment successful. Backend and frontend running as build ${BUILD_NUMBER}.'
+                    echo "Deployment successful. Backend and frontend running as build ${BUILD_NUMBER}."
                 }
             }
         }
@@ -492,17 +493,20 @@ pipeline {
             $COMMIT_LOG"
 
                         git push https://timmyngn37:$GIT_TOKEN@github.com/timmyngn37/film-streaming-platform.git v$BUILD_NUMBER
+
+                        # Escape commit log for safe JSON injection
                         COMMIT_LOG_ESCAPED=$(echo "$COMMIT_LOG" \
                             | sed 's/\\/\\\\/g; s/"/\\"/g' \
                             | awk '{printf "%s\\n", $0}' \
                             | sed '$ s/\\n$//')
-                        
+
                         # Create GitHub Release via API
                         RELEASE_RESPONSE=$(curl -s -X POST \
                             -H "Authorization: token $GIT_TOKEN" \
                             -H "Content-Type: application/json" \
                             -d "{\"tag_name\": \"v$BUILD_NUMBER\", \"name\": \"Release v$BUILD_NUMBER\", \"body\": \"$COMMIT_LOG_ESCAPED\", \"draft\": false, \"prerelease\": false}" \
                             https://api.github.com/repos/timmyngn37/film-streaming-platform/releases)
+
                         RELEASE_URL=$(echo "$RELEASE_RESPONSE" | grep -o '"html_url":"[^"]*"' | head -1 | cut -d'"' -f4)
                         echo "GitHub Release created: $RELEASE_URL"
                     '''
@@ -526,10 +530,11 @@ pipeline {
                     echo 'Configuring monitoring...'
 
                     sh '''
-                    
+                        # Stop and remove containers while preserving named volumes.
                         docker compose stop prometheus grafana node-exporter alertmanager 2>/dev/null || true
                         docker compose rm -f prometheus grafana node-exporter alertmanager 2>/dev/null || true
-                        VERSION=$BUILD_NUMBER docker compose up -d prometheus grafana node-exporter alertmanager
+
+                        docker compose up -d prometheus grafana node-exporter alertmanager
 
                         echo "Waiting for services to start..."
 
@@ -614,7 +619,8 @@ pipeline {
                         docker logs node-exporter 2>/dev/null || true
                     '''
                     sh '''
-                        docker rm -f prometheus grafana node-exporter alertmanager 2>/dev/null || true
+                        docker compose stop prometheus grafana node-exporter alertmanager 2>/dev/null || true
+                        docker compose rm -f prometheus grafana node-exporter alertmanager 2>/dev/null || true
                     '''
                 }
             }
@@ -625,7 +631,7 @@ pipeline {
             echo 'Cleaning up...'
             // Remove unused Docker images to free up disk space
             sh 'docker image prune -f || true'
-            // Use the cleanWs step to clean up the workspace after the pipeline completes  
+            // Use the cleanWs step to clean up the workspace after the pipeline completes
             cleanWs(patterns: [[pattern: 'prometheus.yml', type: 'EXCLUDE']])
         }
     }
