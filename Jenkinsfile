@@ -476,9 +476,10 @@ pipeline {
                     sh '''
                         # Install jq if not present
                         if ! command -v jq &> /dev/null; then
-                            apt-get install -y jq 2>/dev/null || apk add jq 2>/dev/null || true
+                            curl -sL https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-amd64 \
+                                -o /usr/local/bin/jq && chmod +x /usr/local/bin/jq
                         fi
-                        
+
                         git config user.email "jenkins@ci.com"
                         git config user.name "Jenkins"
 
