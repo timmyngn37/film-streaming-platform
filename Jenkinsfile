@@ -403,10 +403,8 @@ pipeline {
                         cp /var/jenkins_home/.env backend/.env
 
                         docker rm -f node-exporter grafana prometheus 2>/dev/null || true
-                        VERSION=$BUILD_NUMBER docker compose up -d sonarqube
-                        sleep 30
-
-                        docker compose up -d backend frontend
+                        
+                        VERSION=$BUILD_NUMBER docker compose up -d backend frontend
                         sleep 10
 
                         docker ps | grep my-backend || exit 1
@@ -420,20 +418,32 @@ pipeline {
                     echo 'Deployment failed. Rolling back...'
                     // If deployment fails, read the previous version from the file and roll back to it using Docker Compose.
                     sh '''
-                        PREVIOUS=$(cat .previous_version)
-                        if [ "$PREVIOUS" != "none" ]; then
-                            docker compose down --remove-orphans || true
-                            docker rm -f node-exporter grafana prometheus sonarqube 2>/dev/null || true
-                            sed -i "s|$IMAGE_BACKEND|$PREVIOUS|g" docker-compose.yml
-                            VERSION=$BUILD_NUMBER docker compose up -d
-                            sleep 10
-                            docker ps | grep my-backend && echo "Rollback successful to $PREVIOUS" || echo "Rollback failed"
-                            echo "Rolled back to $PREVIOUS"
+                        if [ ! -f .previous_version ]; then
+                            echo "No previous version recorded, skipping rollback."
+                            exit 0
                         fi
+                        
+                    PREVIOUS=$(cat .previous_version)
+                    if [ -z "$PREVIOUS" ] || [ "$PREVIOUS" = "none" ]; then
+                        echo "No valid previous version found, skipping rollback."
+                        exit 0
+                    fi
+                    echo "Rolling back to: $PREVIOUS"
+
+                   docker compose down --remove-orphans || true
+                   docker rm -f node-exporter grafana prometheus 2>/dev/null || true
+                   
+                   sed -i "s|$IMAGE_BACKEND|$PREVIOUS|g" docker-compose.yml
+                   VERSION=$BUILD_NUMBER docker compose up -d backend frontend
+                   sleep 10
+
+                    curl -f http://host.docker.internal:5000/health \
+                    && echo "Rollback successful to $PREVIOUS" \
+                    || echo "Rollback health check failed"
                     '''
                 }
                 success {
-                    echo 'Deployment successful.'
+                    echo 'Deployment successful. Backend and frontend running as build ${BUILD_NUMBER}.'
                 }
             }
         }
