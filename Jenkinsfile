@@ -173,7 +173,7 @@ pipeline {
         stage('Code Quality Stage') {
             steps {
                 echo 'Running SonarQube analysis...'
-                // Use withSonarQubeEnv to set up the environment for SonarQube analysis and run the sonar-scanner command.
+
                 script {
                     def scannerHome = tool 'SonarScanner'
 
@@ -183,11 +183,12 @@ pipeline {
                                 -Dproject.settings=backend/sonar-project.properties
                         """
                     }
-                    // Wait for SonarQube analysis to complete and check the quality gate status.
-                    // Use a timeout to avoid waiting indefinitely for the quality gate result.
+
+                    // Wait for SonarQube Quality Gate result
                     timeout(time: 3, unit: 'MINUTES') {
-                        def qg = waitForQualityGate abortPipeline: false
+                        def qg = waitForQualityGate()
                         echo "Quality Gate status: ${qg.status}"
+
                         if (qg.status != 'OK') {
                             error "Quality Gate failed: ${qg.status}"
                         } else {
@@ -196,6 +197,7 @@ pipeline {
                     }
                 }
             }
+
             post {
                 success {
                     echo 'SonarQube analysis completed successfully.'
