@@ -491,25 +491,25 @@ pipeline {
 
                         git tag -a v$BUILD_NUMBER -m "Release version $BUILD_NUMBER
 
-            Changes:
-            $COMMIT_LOG"
+                    Changes:
+                    $COMMIT_LOG"
 
                         git push https://timmyngn37:$GIT_TOKEN@github.com/timmyngn37/film-streaming-platform.git v$BUILD_NUMBER
 
-                        # Escape commit log for safe JSON injection
-                        COMMIT_LOG_ESCAPED=$(echo "$COMMIT_LOG" \
-                            | sed 's/\\/\\\\/g; s/"/\\"/g' \
-                            | awk '{printf "%s\\n", $0}' \
-                            | sed '$ s/\\n$//')
+                        # Build JSON body safely using jq — no manual escaping needed
+                        BODY=$(jq -n \
+                            --arg tag "v$BUILD_NUMBER" \
+                            --arg body "$COMMIT_LOG" \
+                            '{tag_name: $tag, name: ("Release " + $tag), body: $body, draft: false, prerelease: false}')
 
                         # Create GitHub Release via API
                         RELEASE_RESPONSE=$(curl -s -X POST \
                             -H "Authorization: token $GIT_TOKEN" \
                             -H "Content-Type: application/json" \
-                            -d "{\"tag_name\": \"v$BUILD_NUMBER\", \"name\": \"Release v$BUILD_NUMBER\", \"body\": \"$COMMIT_LOG_ESCAPED\", \"draft\": false, \"prerelease\": false}" \
+                            -d "$BODY" \
                             https://api.github.com/repos/timmyngn37/film-streaming-platform/releases)
 
-                        RELEASE_URL=$(echo "$RELEASE_RESPONSE" | grep -o '"html_url":"[^"]*"' | head -1 | cut -d'"' -f4)
+                        RELEASE_URL=$(echo "$RELEASE_RESPONSE" | jq -r '.html_url // empty')
                         echo "GitHub Release created: $RELEASE_URL"
                     '''
                 }
