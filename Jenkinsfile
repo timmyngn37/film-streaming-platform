@@ -368,6 +368,10 @@ pipeline {
                             }
                         }
                     }
+                }
+            }
+            post {
+                always {
                     // Archive all the generated JSON reports
                     archiveArtifacts(
                         artifacts: 'audit-report-backend.json, audit-report-frontend.json, trivy-backend.json, trivy-frontend.json',
@@ -375,10 +379,8 @@ pipeline {
                         allowEmptyArchive: true
                     )
                 }
-            }
-            post {
                 success {
-                    echo 'Security checks completed. No critical issues found.'
+                    echo 'Security checks completed. Review console log and archived reports for full vulnerability details.'
                 }
                 unstable {
                     echo 'Security checks found high/critical vulnerabilities - manual review required.'
