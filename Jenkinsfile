@@ -474,12 +474,6 @@ pipeline {
                     string(credentialsId: 'github-token', variable: 'GIT_TOKEN')
                 ]) {
                     sh '''
-                        # Install jq if not present
-                        if ! command -v jq &> /dev/null; then
-                            curl -sL https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-amd64 \
-                                -o /usr/local/bin/jq && chmod +x /usr/local/bin/jq
-                        fi
-
                         git config user.email "jenkins@ci.com"
                         git config user.name "Jenkins"
 
@@ -502,11 +496,16 @@ pipeline {
 
                         git push https://timmyngn37:$GIT_TOKEN@github.com/timmyngn37/film-streaming-platform.git v$BUILD_NUMBER
 
-                        # Build JSON body safely using jq — no manual escaping needed
-                        BODY=$(jq -n \
-                            --arg tag "v$BUILD_NUMBER" \
-                            --arg body "$COMMIT_LOG" \
-                            '{tag_name: $tag, name: ("Release " + $tag), body: $body, draft: false, prerelease: false}')
+                        # Build JSON body safely using Python
+                        BODY=$(python3 -c "
+                    import json, sys
+                    tag = 'v$BUILD_NUMBER'
+                    body = sys.stdin.read()
+                    print(json.dumps({'tag_name': tag, 'name': 'Release ' + tag, 'body': body, 'draft': False, 'prerelease': False}))
+                    " <<'EOF'
+                    $COMMIT_LOG
+                    EOF
+                    )
 
                         # Create GitHub Release via API
                         RELEASE_RESPONSE=$(curl -s -X POST \
@@ -515,7 +514,7 @@ pipeline {
                             -d "$BODY" \
                             https://api.github.com/repos/timmyngn37/film-streaming-platform/releases)
 
-                        RELEASE_URL=$(echo "$RELEASE_RESPONSE" | jq -r '.html_url // empty')
+                        RELEASE_URL=$(echo "$RELEASE_RESPONSE" | python3 -c "import json,sys; print(json.load(sys.stdin).get('html_url',''))")
                         echo "GitHub Release created: $RELEASE_URL"
                     '''
                 }
